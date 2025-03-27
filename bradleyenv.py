@@ -10,6 +10,7 @@ class BradleyAirportEnv(gym.Env):
         # State Space 
         self.aircraft_size = [0, 1]  # 0: Small, 1: Large
         self.aircraft_speed = [0, 1, 2]  # Speed buckets (low, medium, high)
+        self.aircraft_type = [0, 1, 2, 3, 4, 5] # Commercial, cargo, private, military, small
         self.runway_assignment = [0, 1]  # Runway choice (0 or 1)
         self.runway_direction = [0, 1]  # Runway facing direction
         self.wind_speed = [0, 1]  # Low or High
@@ -21,6 +22,7 @@ class BradleyAirportEnv(gym.Env):
         self.observation_space = spaces.MultiDiscrete([
             len(self.aircraft_size),
             len(self.aircraft_speed),
+            len(self.aircraft_type),
             len(self.runway_assignment),
             len(self.runway_direction),
             len(self.wind_speed),
@@ -51,6 +53,7 @@ class BradleyAirportEnv(gym.Env):
         self.state = [
             random.choice(self.aircraft_size),
             random.choice(self.aircraft_speed),
+            random.choice(self.aircraft_type),
             random.choice(self.runway_assignment),
             random.choice(self.runway_direction),
             random.choice(self.wind_speed),
