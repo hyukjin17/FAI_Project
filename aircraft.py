@@ -28,6 +28,7 @@ class Aircraft:
         self.size = type_info["size"]
         self.color = type_info["color"]
         self.direction = 0
+        self.runway = None
 
         if self.flight_state == 0:
             # Randomly spawn outside the screen
@@ -36,27 +37,27 @@ class Aircraft:
             if edge == "left":
                 self.x, self.y = -10, random.randint(0, screen_height)
                 if self.y < screen_height / 2:
-                    self.direction = random.uniform(0, math.pi / 4)
+                    self.direction = random.uniform(0, np.pi / 4)
                 else:
-                    self.direction = random.uniform(0, -math.pi / 4)
+                    self.direction = random.uniform(0, -np.pi / 4)
             elif edge == "right":
                 self.x, self.y = screen_width + 10, random.randint(0, screen_height)
                 if self.y < screen_height / 2:
-                    self.direction = random.uniform(3 * math.pi / 4, math.pi)
+                    self.direction = random.uniform(3 * np.pi / 4, np.pi)
                 else:
-                    self.direction = random.uniform(-3 * math.pi / 4, math.pi)
+                    self.direction = random.uniform(-3 * np.pi / 4, -np.pi)
             elif edge == "top":
                 self.x, self.y = random.randint(0, screen_width), -10
                 if self.x < screen_width / 2:
-                    self.direction = random.uniform(-math.pi / 2, -math.pi / 4)
+                    self.direction = random.uniform(-np.pi / 2, -np.pi / 4)
                 else:
-                    self.direction = random.uniform(-3 * math.pi / 4, -math.pi / 2)
+                    self.direction = random.uniform(-3 * np.pi / 4, -np.pi / 2)
             else:  # "bottom"
                 self.x, self.y = random.randint(0, screen_width), screen_height + 10
                 if self.x < screen_height / 2:
-                    self.direction = random.uniform(math.pi / 4, math.pi / 2)
+                    self.direction = random.uniform(np.pi / 4, np.pi / 2)
                 else:
-                    self.direction = random.uniform(math.pi / 2, 3 * math.pi / 4)
+                    self.direction = random.uniform(np.pi / 2, 3 * np.pi / 4)
         else:
             # Set to the position of the airport
             self.x, self.y = 50, 50
@@ -71,9 +72,10 @@ class Aircraft:
         self.y += self.dy
 
     def change_direction(self, direction):
-        self.direction = direction
-        self.dx = (self.speed / SPEED_FRACTION) * math.cos(self.direction)  # Normalize speed
-        self.dy = (self.speed / SPEED_FRACTION) * math.sin(self.direction)
+        if self.direction != direction:
+            self.direction = direction
+            self.dx = (self.speed / SPEED_FRACTION) * math.cos(self.direction)  # Normalize speed
+            self.dy = (self.speed / SPEED_FRACTION) * math.sin(self.direction)
 
     # Check if the plane has exited the screen
     def is_off_screen(self):
@@ -84,4 +86,5 @@ class Aircraft:
     # May need to add more info (like nearby planes)
     def get_obs(self):
         plane_type = list(self.PLANE_TYPES.keys()).index(self.plane_type)  # Assign integer value (index) to plane type
-        return np.array([self.size, self.speed, plane_type, self.flight_state], dtype=np.float32)
+        speed = 0 if self.speed < 200 else 1 if self.speed < 400 else 3
+        return np.array([0 if self.size < 5 else 1, speed, plane_type, self.flight_state], dtype=np.float32)
