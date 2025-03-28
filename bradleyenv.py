@@ -2,21 +2,25 @@ import gym
 from gym import spaces
 import numpy as np
 import random
+import pygame
 
 class BradleyAirportEnv(gym.Env):
-    def __init__(self):
+    def __init__(self, screen_width=800, screen_height=800):
         super(BradleyAirportEnv, self).__init__()
+        self.screen_width = screen_width
+        self.screen_height = screen_height
 
         # State Space 
         self.aircraft_size = [0, 1]  # 0: Small, 1: Large
         self.aircraft_speed = [0, 1, 2]  # Speed buckets (low, medium, high)
         self.aircraft_type = [0, 1, 2, 3, 4, 5] # Commercial, cargo, private, military, small
         self.runway_assignment = [0, 1]  # Runway choice (0 or 1)
-        self.runway_direction = [0, 1]  # Runway facing direction
+        self.runway_direction = [0, 1]  # Runway facing direction (+ or - coordinate)
         self.wind_speed = [0, 1]  # Low or High
-        self.wind_direction = [0, 1, 2, 3]  # North, South, West, East
-        self.takeoff_or_landing = [0, 1]  # 0: Takeoff, 1: Landing
+        self.wind_direction = [0, 1, 2, 3, 4, 5, 6, 7]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
+        self.takeoff_or_landing = [0, 1, 2]  # 0: Takeoff, 1: Landing, 2: Neither
         self.current_state = [0, 1, 2, 3]  # 0: In Air, 1: Taxiway, 2: Runway, 3: At Gate
+        self.planes = []
 
         # Observation Space
         self.observation_space = spaces.MultiDiscrete([
@@ -49,6 +53,7 @@ class BradleyAirportEnv(gym.Env):
         self.reset()
 
     def reset(self):
+        self.planes = []
         
         self.state = [
             random.choice(self.aircraft_size),
@@ -62,6 +67,20 @@ class BradleyAirportEnv(gym.Env):
             0  # Assume initially in air
         ]
         self.time_step = 0
+        return np.array(self.state, dtype=np.int32), 0, False
+    
+    def get_obs(self):
+        self.state = [
+            self.aircraft_size,
+            self.aircraft_speed,
+            self.aircraft_type,
+            self.runway_assignment,
+            self.runway_direction,
+            self.wind_speed,
+            self.wind_direction,
+            self.takeoff_or_landing,
+            self.current_state
+        ]
         return np.array(self.state, dtype=np.int32)
 
     def step(self, action):
@@ -125,10 +144,40 @@ class BradleyAirportEnv(gym.Env):
         if self.time_step >= 50:
             done = True  
 
-        return np.array(self.state, dtype=np.int32), reward, done, {}
+        return np.array(self.state, dtype=np.int32), reward, done
+    
+    # Add a new plane to the environment
+    def add_plane(self):
+        if self.traffic < self.max_aircraft:
+            plane = Aircraft(self.screen_width, self.screen_height)
+            self.planes.append(plane)
+
+    def remove_plane(self, plane):
+        self.planes.remove(plane)
 
     def render(self):
-        print(f"Step: {self.time_step} | State: {self.state} | Actions: {self.actions}")
+        if self.render_mode == "human":
+            if self.screen is None:
+                pygame.init()
+                self.screen = pygame.display.set_mode((500, 500))
+                self.clock = pygame.time.Clock()
+
+            self.screen.fill((0, 0, 0))  # Clear screen
+            env.update() # update the positions to next time tick
+
+            # Draw runways
+            pygame.draw.rect(self.screen, (200, 200, 200), (100, 200, 300, 10))  # Horizontal runway
+            pygame.draw.rect(self.screen, (200, 200, 200), (200, 100, 10, 300))  # Intersecting vertical runway
+
+            # Draw taxiway
+            pygame.draw.rect(self.screen, (100, 100, 100), (80, 200, 10, 150))  # Parallel taxiway
+
+            # Draw each plane
+            for plane in self.planes:
+                pygame.draw.circle(self.screen, plane.color, (int(plane.x), int(plane.y)), plane.size)
+
+        print(
+            f"Time Step: {self.time_step} | Wind Speed: {self.wind_speed} | Wind Direction {self.wind_direction} | State: {self.current_state} | Action: {self.actions}")
 
 
 # Testing the Environment
@@ -140,7 +189,7 @@ if __name__ == "__main__":
     max_steps = 20  
 
     for episode in range(num_episodes):
-        obs = env.reset()
+        obs, reward, done = env.reset()
         print(f"\n==== Episode {episode + 1} ====")
 
         for step in range(max_steps):
