@@ -21,6 +21,7 @@ class BradleyAirportEnv(gym.Env):
         self.aircraft_size = [0, 1]  # 0: Small, 1: Large
         self.aircraft_speed = [0, 1, 2]  # Speed buckets (low, medium, high)
         self.aircraft_type = [0, 1, 2, 3, 4, 5] # Commercial, cargo, private, military, small
+        # 0 for left, 1 for right, 2 for bottom, 3 for top entry of the runways
         self.runway_assignment = [0, 1, 2, 3]  # Runway choice and direction (0, 1 for horizontal; 2, 3 for vertical)
         self.wind_speed = [0, 1]  # Low or High
         self.wind_direction = [np.pi/2, np.pi/4, 0, -np.pi/4, -np.pi/2, -3*np.pi/4, np.pi, 3*np.pi/4]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
@@ -91,14 +92,21 @@ class BradleyAirportEnv(gym.Env):
         return np.array(self.state, dtype=np.int32)
     
     def move(self, plane, action):
-        if action in [0,1,2,3] and plane.flight_state == 2:  # If already near runway
-            return 10  # Penalty for unnecessary turns near runway
+        if plane.flight_state in [1,2]:  # If already on runway or taxiway
+            return -10  # Penalty for unnecessary moves
         crosswind = self.is_within_pi(self.wind_direction, plane.direction)
-        if (plane.runway == 0 and 100 < plane.x < 400 and 200 < plane.y < 210) or (
-            plane.runway == 1 and 100 < plane.y < 400 and 200 < plane.x < 210):
-            plane.move()
+        if plane.runway == 0:
+            correct_landing_angle = True if -np.pi/4 < plane.direction < np.pi/4 else False
+        elif plane.runway == 1:
+            correct_landing_angle = True if -np.pi < plane.direction < -3*np.pi/4 or 3*np.pi/4 < plane.direction < np.pi else False
+        elif plane.runway == 2:
+            correct_landing_angle = True if np.pi/4 < plane.direction < 3*np.pi/4 else False
+        elif plane.runway == 3:
+            correct_landing_angle = True if -3*np.pi/4 < plane.direction < -np.pi/4 else False
+        if (plane.runway in [0,1] and 100 < plane.x < 400 and 200 < plane.y < 210) or (
+            plane.runway in [2,3] and 100 < plane.y < 400 and 200 < plane.x < 210):
             plane.flight_state, self.current_state = 2, 2
-            return 100 if crosswind and self.wind_speed == 0 else -100
+            return -200 if not correct_landing_angle else 100 if crosswind and self.wind_speed == 0 else -100
         
         if action == 0: # turn left
             plane.change_direction(np.pi)
@@ -108,7 +116,6 @@ class BradleyAirportEnv(gym.Env):
             plane.change_direction(np.pi/2)
         elif action == 3: # go down
             plane.change_direction(-np.pi/2)
-        plane.move()
         return 0
     
     def is_within_pi(theta1, theta2):
@@ -124,30 +131,29 @@ class BradleyAirportEnv(gym.Env):
         aircraft_size, aircraft_speed, aircraft_type, runway, wind_speed, wind_dir, current_state = self.get_obs()
 
         
-        if action in [0, 1, 2, 3, 12]:  # Moving
+        if action in [0, 1, 2, 3, 12]:  # Moving or changing direction
             reward = self.move(plane, action)
 
         elif action in [4, 5, 6, 7]:  # Assign runway
-            reward = self.assign_runway(plane, action)
             if aircraft_size == 1 and action == 4:  # Large aircraft on short runway
                 reward -= 100  # Penalty for landing on the wrong runway
             else:
                 self.state[2] = action - 4  # Update runway assignment
+                plane.runway = action - 4
 
         elif action in [8, 9]:  # Taxi
-            if current_state == 2:  # If already on runway, cannot taxi
-                reward -= 10
-            else:
-                self.state[7] = action - 8  # Move to taxiway
+            self.state[7] = action - 8  # Move to taxiway
+            plane.runway = None
+            # Need to move to taxiway and set new state
 
         elif action == 10:  # Wait
             reward -= 1  # Penalty for waiting too long
 
-        # Check for wind direction mismatch
-        if (runway_dir != wind_dir):
-            reward += 100  # Reward for correct alignment
-        else:
-            reward -= 100  # Penalty for incorrect wind alignment
+        elif action == 11: # Takeoff
+            pass
+            # need to make sure state is updated and plane starts to move
+
+        plane.move() # Move the plane at each time step
 
         # Check if aircraft is landing at too sharp an angle
         landing_angle = random.randint(-60, 60)  # landing angle

@@ -24,11 +24,12 @@ class Aircraft:
         type_info = self.PLANE_TYPES[self.plane_type]
 
         # Assign speed based on type
-        self.speed = random.uniform(type_info["speed_range"][0], type_info["speed_range"][1]) if self.flight_state == 0 else 0
+        self.speed = random.uniform(type_info["speed_range"][0], type_info["speed_range"][1])
         self.size = type_info["size"]
         self.color = type_info["color"]
         self.direction = 0
         self.runway = None
+        self.takeoff = True if self.flight_state == 3 else False
 
         if self.flight_state == 0:
             # Randomly spawn outside the screen
@@ -63,8 +64,8 @@ class Aircraft:
             self.x, self.y = 50, 50
 
         # Compute velocity components
-        self.dx = (self.speed / SPEED_FRACTION) * math.cos(self.direction)  # Normalize speed
-        self.dy = (self.speed / SPEED_FRACTION) * math.sin(self.direction)
+        self.dx = (self.speed / SPEED_FRACTION) * math.cos(self.direction) if self.flight_state == 0 else 0 # Normalize speed
+        self.dy = (self.speed / SPEED_FRACTION) * math.sin(self.direction) if self.flight_state == 0 else 0
 
     # Move by the speed at each time step
     def move(self):
