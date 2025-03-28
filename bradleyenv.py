@@ -3,6 +3,7 @@ from gym import spaces
 import numpy as np
 import random
 import pygame
+from aircraft import Aircraft
 
 class BradleyAirportEnv(gym.Env):
     def __init__(self, screen_width=800, screen_height=800):
