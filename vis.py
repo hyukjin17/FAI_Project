@@ -41,7 +41,7 @@ def main():
     clock = pygame.time.Clock()
     running = True
     if len(game.planes) == 0:
-        game.add_plane
+        game.add_plane()
 
     while running:
         for event in pygame.event.get():
