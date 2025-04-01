@@ -72,6 +72,11 @@ def main():
                 if event.key == pygame.K_p and not game_ended:
                     action = 7
                     result = game.step(action)
+                if event.key == pygame.K_m and not game_ended:
+                    for plane in game.planes:
+                        plane.move()
+                if event.key == pygame.K_z and not game_ended:
+                    game.add_plane()
         screen.fill(BLACK)
 
         # Draw runways
