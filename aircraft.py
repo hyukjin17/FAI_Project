@@ -25,11 +25,13 @@ class Aircraft:
 
         # Assign speed based on type
         self.speed = random.uniform(type_info["speed_range"][0], type_info["speed_range"][1])
+        self.max_speed = type_info["speed_range"][1]
         self.size = type_info["size"]
         self.color = type_info["color"]
         self.direction = 0
         self.runway = None
         self.takeoff = True if self.flight_state == 3 else False
+        self.turning_radius = self.size * (self.speed / SPEED_FRACTION) * (self.speed / SPEED_FRACTION)
 
         if self.flight_state == 0:
             # Randomly spawn outside the screen
@@ -40,19 +42,19 @@ class Aircraft:
                 if self.y < screen_height / 2:
                     self.direction = random.uniform(0, np.pi / 4)
                 else:
-                    self.direction = random.uniform(0, -np.pi / 4)
+                    self.direction = random.uniform(2*np.pi, 7*np.pi / 4)
             elif edge == "right":
                 self.x, self.y = screen_width + 10, random.randint(0, screen_height)
                 if self.y < screen_height / 2:
                     self.direction = random.uniform(3 * np.pi / 4, np.pi)
                 else:
-                    self.direction = random.uniform(-3 * np.pi / 4, -np.pi)
+                    self.direction = random.uniform(5 * np.pi / 4, np.pi)
             elif edge == "top":
                 self.x, self.y = random.randint(0, screen_width), -10
                 if self.x < screen_width / 2:
-                    self.direction = random.uniform(-np.pi / 2, -np.pi / 4)
+                    self.direction = random.uniform(3 * np.pi / 2, 7 * np.pi / 4)
                 else:
-                    self.direction = random.uniform(-3 * np.pi / 4, -np.pi / 2)
+                    self.direction = random.uniform(5 * np.pi / 4, 3 * np.pi / 2)
             else:  # "bottom"
                 self.x, self.y = random.randint(0, screen_width), screen_height + 10
                 if self.x < screen_height / 2:
@@ -72,11 +74,36 @@ class Aircraft:
         self.x += self.dx
         self.y += self.dy
 
+    def turn(self, turn_direction):
+        omega = self.speed / self.turning_radius
+        dtheta = omega
+
+        if (turn_direction == "left"):
+            cx = self.x - self.turning_radius * math.sin(self.direction)
+            cy = self.y + self.turning_radius * math.cos(self.direction)
+            self.change_direction(dtheta)
+        else:
+            cx = self.x + self.turning_radius * math.sin(self.direction)
+            cy = self.y - self.turning_radius * math.cos(self.direction)
+            self.change_direction(-dtheta)
+        self.x = cx + self.turning_radius * math.cos(self.direction)
+        self.y = cy + self.turning_radius * math.sin(self.direction)
+        
+    def set_dx_dy(self, speed, direction):
+        self.dx = (speed / SPEED_FRACTION) * math.cos(direction)  # Normalize speed
+        self.dy = (speed / SPEED_FRACTION) * math.sin(direction)
+        
+    def change_speed(self, dv):
+        if (self.speed + dv < self.max_speed):
+            self.speed += dv
+            self.set_dx_dy(self.speed, self.direction)
+            self.turning_radius = self.size * (self.speed / SPEED_FRACTION) * (self.speed / SPEED_FRACTION)
+
     def change_direction(self, direction):
         if self.direction != direction:
-            self.direction = direction
-            self.dx = (self.speed / SPEED_FRACTION) * math.cos(self.direction)  # Normalize speed
-            self.dy = (self.speed / SPEED_FRACTION) * math.sin(self.direction)
+            self.direction = (self.direction + direction) % (2 * np.pi)
+            self.set_dx_dy(self.speed, self.direction)
+
 
     # Check if the plane has exited the screen
     def is_off_screen(self):
