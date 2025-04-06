@@ -128,7 +128,7 @@ class BradleyAirportEnv(gym.Env):
         reward = 0
         done = False
         self.time_step += 1
-        aircraft_size, aircraft_speed, aircraft_type, runway, wind_speed, wind_dir, current_state = self.get_obs()
+        aircraft_size, aircraft_speed, aircraft_type, runway, wind_speed, wind_dir, current_state = self.get_obs(plane)
         
         if action in [0, 1, 2, 3, 12]:  # Moving or changing direction
             reward = self.move(plane, action)
