@@ -13,7 +13,7 @@ class BradleyAirportEnv(gym.Env):
         super(BradleyAirportEnv, self).__init__()
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.max_aircraft = 10
+        self.max_aircraft = 5
 
         # State Space 
         self.x_distance_to_runway = [i for i in range(self.screen_width)]
@@ -43,18 +43,19 @@ class BradleyAirportEnv(gym.Env):
         ])
 
         # Action Space
-        self.action_space = spaces.Discrete(10)  
+        num_actions = 13
+        self.action_space = spaces.MultiDiscrete([num_actions for _ in range(self.max_aircraft)])
         self.actions = {
             0: "turn_left",
             1: "turn_right",
-            2: "turn_up",
-            3: "turn_down",
+            2: "speed_up",
+            3: "slow_down",
             4: "assign_runway_0_direction_0",
             5: "assign_runway_0_direction_1",
             6: "assign_runway_1_direction_0",
             7: "assign_runway_1_direction_1",
-            8: "taxi_1",
-            9: "taxi_2",
+            8: "taxi",
+            9: "go_to_gate",
             10: "wait",
             11: "takeoff",
             12: "go_straight"
@@ -96,26 +97,26 @@ class BradleyAirportEnv(gym.Env):
             return -10  # Penalty for unnecessary moves
         crosswind = self.is_within_pi(self.wind_direction, plane.direction)
         if plane.runway == 0:
-            correct_landing_angle = True if -np.pi/4 < plane.direction < np.pi/4 else False
+            correct_landing_angle = True if 7*np.pi/4 < plane.direction < 2*np.pi or 0 < plane.direction < np.pi/4 else False
         elif plane.runway == 1:
-            correct_landing_angle = True if -np.pi < plane.direction < -3*np.pi/4 or 3*np.pi/4 < plane.direction < np.pi else False
+            correct_landing_angle = True if 3*np.pi/4 < plane.direction < 5*np.pi/4 else False
         elif plane.runway == 2:
             correct_landing_angle = True if np.pi/4 < plane.direction < 3*np.pi/4 else False
         elif plane.runway == 3:
-            correct_landing_angle = True if -3*np.pi/4 < plane.direction < -np.pi/4 else False
+            correct_landing_angle = True if 5*np.pi/4 < plane.direction < 7*np.pi/4 else False
         if (plane.runway in [0,1] and 100 < plane.x < 400 and 200 < plane.y < 210) or (
             plane.runway in [2,3] and 100 < plane.y < 400 and 200 < plane.x < 210):
             plane.flight_state, self.current_state = 2, 2
             return -200 if not correct_landing_angle else 100 if crosswind and self.wind_speed == 0 else -100
         
         if action == 0: # turn left
-            plane.change_direction(np.pi)
+            plane.turn("left")
         elif action == 1: # turn right
-            plane.change_direction(0)
-        elif action == 2: # go up
-            plane.change_direction(np.pi/2)
-        elif action == 3: # go down
-            plane.change_direction(-np.pi/2)
+            plane.turn("right")
+        elif action == 2: # speed up
+            plane.change_speed(10)
+        elif action == 3: # slow down
+            plane.change_speed(-10)
         return 0
     
     def is_within_pi(theta1, theta2):
@@ -123,13 +124,11 @@ class BradleyAirportEnv(gym.Env):
         delta_theta = (delta_theta + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
         return abs(delta_theta) <= np.pi
 
-
-    def step(self, plane, action):
+    def execute_action(self, plane, action):
         reward = 0
         done = False
         self.time_step += 1
         aircraft_size, aircraft_speed, aircraft_type, runway, wind_speed, wind_dir, current_state = self.get_obs()
-
         
         if action in [0, 1, 2, 3, 12]:  # Moving or changing direction
             reward = self.move(plane, action)
@@ -180,6 +179,11 @@ class BradleyAirportEnv(gym.Env):
             done = True  
 
         return np.array(self.state, dtype=np.int32), reward, done
+
+    def step(self, actions):
+        for plane_index, action in enumerate(actions):
+            plane = self.planes[plane_index]
+            self.execute_action(plane, action)
     
     # Add a new plane to the environment
     def add_plane(self):
