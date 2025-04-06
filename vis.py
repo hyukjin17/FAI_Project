@@ -48,35 +48,39 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_w and not game_ended:
-                    action = 2
-                    result = game.step(action)
-                if event.key == pygame.K_s and not game_ended:
-                    action = 3
-                    result = game.step(action)
-                if event.key == pygame.K_a and not game_ended:
-                    action = 0
-                    result = game.step(action)
-                if event.key == pygame.K_d and not game_ended:
-                    action = 1
-                    result = game.step(action)
-                if event.key == pygame.K_u and not game_ended:
-                    action = 4
-                    result = game.step(action)
-                if event.key == pygame.K_i and not game_ended:
-                    action = 5
-                    result = game.step(action)
-                if event.key == pygame.K_o and not game_ended:
-                    action = 6
-                    result = game.step(action)
-                if event.key == pygame.K_p and not game_ended:
-                    action = 7
-                    result = game.step(action)
-                if event.key == pygame.K_m and not game_ended:
-                    for plane in game.planes:
-                        plane.move()
-                if event.key == pygame.K_z and not game_ended:
-                    game.add_plane()
+                if event.key in [pygame.K_0, pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4]:
+                    selected_plane_index = int(event.unicode)  # Plane index from key
+                    print(f"Selected plane: {selected_plane_index}")
+                elif not game_ended:
+                    action = None
+                    if event.key == pygame.K_w:
+                        action = 2
+                    if event.key == pygame.K_s:
+                        action = 3
+                    if event.key == pygame.K_a:
+                        action = 0
+                    if event.key == pygame.K_d:
+                        action = 1
+                    if event.key == pygame.K_u:
+                        action = 4
+                    if event.key == pygame.K_i:
+                        action = 5
+                    if event.key == pygame.K_o:
+                        action = 6
+                    if event.key == pygame.K_p:
+                        action = 7
+                    if event.key == pygame.K_m:
+                        for plane in game.planes:
+                            plane.move()
+                    if event.key == pygame.K_z:
+                        game.add_plane()
+                    if action is not None:
+                        if selected_plane_index < len(game.planes):
+                            actions = [12] * len(game.planes)  # Default all to "go_straight"
+                            actions[selected_plane_index] = action
+                            game.step(actions)
+                        else:
+                            print(f"Plane index {selected_plane_index} is out of range.")
         screen.fill(BLACK)
 
         # Draw runways
