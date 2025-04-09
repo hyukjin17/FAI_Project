@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import random
+import numpy as np
 
 class MultiPlaneCNN(nn.Module):
     def __init__(self, num_planes, num_actions):
