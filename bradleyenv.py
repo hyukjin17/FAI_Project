@@ -33,6 +33,9 @@ class BradleyAirportEnv(gym.Env):
         self.screen_height = screen_height
         self.max_aircraft = 5
         self.total_planes = 0
+        self.planes = []
+        self.time_step = 0
+
 
         # Create two Runway objects
         runway_horizontal = Runway(
@@ -52,33 +55,9 @@ class BradleyAirportEnv(gym.Env):
         )
 
         self.runways = [runway_horizontal, runway_vertical]
-
-        # # State Space 
-        # self.x_distance_to_runway = [i for i in range(self.screen_width)]
-        # self.y_distance_to_runway = [i for i in range(self.screen_height)]
-        # self.aircraft_size = [0, 1]  # 0: Small, 1: Large
-        # self.aircraft_speed = [0, 1, 2]  # Speed buckets (low, medium, high)
-        # self.aircraft_type = [0, 1, 2, 3, 4, 5] # Commercial, cargo, private, military, small
-        # # 0 for left, 1 for right, 2 for bottom, 3 for top entry of the runways
-        # self.runway_assignment = [0, 1, 2, 3]  # Runway choice and direction (0, 1 for horizontal; 2, 3 for vertical)
         self.wind_speed = [0, 1]  # Low or High
-        self.wind_direction = [np.pi/2, np.pi/4, 0, 7*np.pi/4, 3*np.pi/2, 5*np.pi/4, np.pi, 3*np.pi/4]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
-        # self.current_state = [0, 1, 2, 3]  # 0: In Air, 1: Taxiway, 2: Runway, 3: At Gate
-        # self.planes = []
-        # self.total_planes = 0
-
-        # # Observation Space
-        # self.observation_space = spaces.MultiDiscrete([
-        #     len(self.x_distance_to_runway),
-        #     len(self.y_distance_to_runway),
-        #     len(self.aircraft_size),
-        #     len(self.aircraft_speed),
-        #     len(self.aircraft_type),
-        #     len(self.runway_assignment),
-        #     len(self.wind_speed),
-        #     len(self.wind_direction),
-        #     len(self.current_state)
-        # ])
+        self.wind_directions = [np.pi/2, np.pi/4, 0, 7*np.pi/4, 3*np.pi/2, 5*np.pi/4, np.pi, 3*np.pi/4]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
+        self.wind_direction = random.choice(self.wind_directions)
 
         # Action Space
         num_actions = 13
@@ -105,31 +84,9 @@ class BradleyAirportEnv(gym.Env):
     def reset(self):
         self.planes = []
         self.total_planes = 0
-        
-        self.state = [
-            random.choice(self.aircraft_size),
-            random.choice(self.aircraft_speed),
-            random.choice(self.aircraft_type),
-            random.choice(self.runway_assignment),
-            random.choice(self.wind_speed),
-            random.choice(self.wind_direction),
-            0  # Assume initially in air
-        ]
+        obs = self.generate_state_grid()
         self.time_step = 0
-        return np.array(self.state, dtype=np.int32), 0, False
-    
-    def get_obs(self, plane):
-        obs = plane.get_obs()
-        self.state = [
-            obs[0],
-            obs[1],
-            obs[2],
-            self.runway_assignment,
-            self.wind_speed,
-            self.wind_direction,
-            obs[3]
-        ]
-        return np.array(self.state, dtype=np.int32)
+        return obs, 0, False
     
     def move(self, plane, action):
         crosswind = self.is_within_pi(self.wind_direction, plane.direction)
@@ -160,7 +117,7 @@ class BradleyAirportEnv(gym.Env):
             plane.move()
         return 0
     
-    def is_within_pi(theta1, theta2):
+    def is_within_pi(self, theta1, theta2):
         delta_theta = theta1 - theta2
         delta_theta = (delta_theta + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
         return abs(delta_theta) <= np.pi
@@ -184,7 +141,6 @@ class BradleyAirportEnv(gym.Env):
         reward = 0
         done = False
         self.time_step += 1
-        aircraft_size, aircraft_speed, aircraft_type, runway, wind_speed, wind_dir, current_state = self.get_obs(plane)
         
         if action in [0, 1, 2, 3, 12]:  # Moving or changing direction
             reward = self.move(plane, action)
@@ -217,24 +173,13 @@ class BradleyAirportEnv(gym.Env):
 
         # Check if aircraft is landing at too sharp an angle
         landing_angle = random.randint(-60, 60)  # landing angle
-        if current_state == 0 and not (-45 <= landing_angle <= 45):
+        if plane.flight_state == 0 and not (-45 <= landing_angle <= 45):
             reward -= 200  # Penalty for sharp landing
 
         # Check for collisions
         if random.random() < 0.05:  # Simulated 5% chance of aircraft collision
             reward -= 1000  # Major penalty for crashes
             done = True
-
-        # Update state randomly for simulation purposes
-        self.state = [
-            aircraft_size,
-            random.choice(self.aircraft_speed),
-            self.state[2],  # Keep runway
-            self.state[3],  # Keep direction
-            random.choice(self.wind_speed),
-            random.choice(self.wind_direction),
-            random.choice(self.current_state)
-        ]
 
         all_landed = True
         # checks if all planes have been assigned to gates
@@ -247,6 +192,8 @@ class BradleyAirportEnv(gym.Env):
 
     def step(self, actions):
         for plane_index, action in enumerate(actions):
+            if plane_index >= len(self.planes):
+                continue  # Skip if action is for non-existing plane
             plane = self.planes[plane_index]
             self.execute_action(plane, action)
             if plane.is_off_screen():
@@ -282,7 +229,7 @@ class BradleyAirportEnv(gym.Env):
 
     # Add a new plane to the environment
     def add_plane(self):
-        if self.planes.size < self.max_aircraft:
+        if len(self.planes) < self.max_aircraft:
             plane = Aircraft(self.screen_width, self.screen_height)
             self.planes.append(plane)
             self.total_planes += 1
