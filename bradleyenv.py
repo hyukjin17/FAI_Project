@@ -24,7 +24,7 @@ class BradleyAirportEnv(gym.Env):
         # 0 for left, 1 for right, 2 for bottom, 3 for top entry of the runways
         self.runway_assignment = [0, 1, 2, 3]  # Runway choice and direction (0, 1 for horizontal; 2, 3 for vertical)
         self.wind_speed = [0, 1]  # Low or High
-        self.wind_direction = [np.pi/2, np.pi/4, 0, -np.pi/4, -np.pi/2, -3*np.pi/4, np.pi, 3*np.pi/4]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
+        self.wind_direction = [np.pi/2, np.pi/4, 0, 7*np.pi/4, 3*np.pi/2, 5*np.pi/4, np.pi, 3*np.pi/4]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
         self.current_state = [0, 1, 2, 3]  # 0: In Air, 1: Taxiway, 2: Runway, 3: At Gate
         self.planes = []
         self.total_planes = 0
