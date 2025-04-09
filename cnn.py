@@ -52,6 +52,19 @@ class MultiPlaneDQNAgent:
         batch = random.sample(self.memory, batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
         return states, actions, rewards, next_states, dones
+    
+    # Choose actions for all planes using epsilon-greedy policy.
+    def select_actions(self, state, epsilon):
+        if random.random() < epsilon:
+            # Random actions
+            actions = np.random.randint(0, self.model.num_actions, size=self.model.num_planes)
+        else:
+            # Greedy actions (highest Q-value from network)
+            state_tensor = torch.tensor(np.array(state)).float().unsqueeze(0).to(self.device)  # (1, channels, H, W)
+            with torch.no_grad():
+                q_values = self.model(state_tensor)  # shape: (1, num_planes, num_actions)
+            actions = q_values.argmax(dim=2).squeeze(0).cpu().numpy()  # best action for each plane
+        return actions
 
     def train(self, batch_size=32):
         if len(self.memory) < batch_size:
@@ -78,3 +91,14 @@ class MultiPlaneDQNAgent:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+    # Save the model weights to a file
+    def save(self, filename):
+        torch.save(self.model.state_dict(), filename)
+        print(f"Model saved to {filename}")
+
+    # Load the model weights from a file
+    def load(self, filename):
+        self.model.load_state_dict(torch.load(filename, map_location=self.device))
+        self.target_model.load_state_dict(self.model.state_dict())
+        print(f"Model loaded from {filename}")
