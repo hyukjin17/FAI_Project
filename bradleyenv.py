@@ -19,7 +19,7 @@ CHANNELS = {
     'plane_sin_heading': 1,
     'plane_cos_heading': 2,
     'plane_speed': 3,
-    'plane_type': 4,
+    'plane_size': 4,
     'runway_presence': 5,
     'runway_direction': 6,
 }
@@ -32,6 +32,7 @@ class BradleyAirportEnv(gym.Env):
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.max_aircraft = 5
+        self.total_planes = 0
 
         # Create two Runway objects
         runway_horizontal = Runway(
@@ -99,6 +100,7 @@ class BradleyAirportEnv(gym.Env):
         }
 
         self.reset()
+        self.add_plane()
 
     def reset(self):
         self.planes = []
@@ -234,7 +236,12 @@ class BradleyAirportEnv(gym.Env):
             random.choice(self.current_state)
         ]
 
-        if self.total_planes == self.max_aircraft:
+        all_landed = True
+        # checks if all planes have been assigned to gates
+        for plane in self.planes:
+            if plane.flight_state != 3:
+                all_landed = False
+        if all_landed:
             done = True
         return obs, reward, done
 
@@ -245,23 +252,23 @@ class BradleyAirportEnv(gym.Env):
             if plane.is_off_screen():
                 self.remove_plane(plane)
     
-    def generate_state_grid(planes, runways, wind_angle, wind_speed, max_speed=10.0, max_wind=20.0):
+    def generate_state_grid(self):
         state = np.zeros((NUM_CHANNELS, GRID_WIDTH, GRID_HEIGHT))
 
         # Populate plane data
-        for plane in planes:
+        for plane in self.planes:
             grid_x = int(plane.x / (SCREEN_WIDTH / GRID_WIDTH))
             grid_y = int(plane.y / (SCREEN_HEIGHT / GRID_HEIGHT))
 
             if 0 <= grid_x < GRID_WIDTH and 0 <= grid_y < GRID_HEIGHT:
                 state[CHANNELS['plane_presence']][grid_x][grid_y] = 1
-                state[CHANNELS['plane_sin_heading']][grid_x][grid_y] = math.sin(plane.angle)  # 🔥
-                state[CHANNELS['plane_cos_heading']][grid_x][grid_y] = math.cos(plane.angle)  # 🔥
-                state[CHANNELS['plane_speed']][grid_x][grid_y] = plane.speed / max_speed  # Normalize speed
-                state[CHANNELS['plane_type']][grid_x][grid_y] = plane.type  # Integer encoding
+                state[CHANNELS['plane_sin_heading']][grid_x][grid_y] = math.sin(plane.direction) # sin encoding plane direction
+                state[CHANNELS['plane_cos_heading']][grid_x][grid_y] = math.cos(plane.direction) # cos encoding plane direction
+                state[CHANNELS['plane_speed']][grid_x][grid_y] = plane.speed
+                state[CHANNELS['plane_size']][grid_x][grid_y] = plane.size
 
         # Populate runway data
-        for runway in runways:
+        for runway in self.runways:
             x_start = int(runway.x_start / (SCREEN_WIDTH / GRID_WIDTH))
             x_end = int(runway.x_end / (SCREEN_WIDTH / GRID_WIDTH))
             y_start = int(runway.y_start / (SCREEN_HEIGHT / GRID_HEIGHT))
@@ -270,19 +277,19 @@ class BradleyAirportEnv(gym.Env):
             for x in range(x_start, min(x_end + 1, GRID_WIDTH)):
                 for y in range(y_start, min(y_end + 1, GRID_HEIGHT)):
                     state[CHANNELS['runway_presence']][x][y] = 1
-                    state[CHANNELS['runway_direction']][x][y] = math.sin(runway.direction)  # Optional: sin encoding runway heading
-
+                    state[CHANNELS['runway_direction']][x][y] = math.sin(runway.direction)  # sin encoding runway direction
         return state
 
     # Add a new plane to the environment
     def add_plane(self):
-        plane = Aircraft(self.screen_width, self.screen_height)
-        self.planes.append(plane)
-        self.total_planes += 1
+        if self.planes.size < self.max_aircraft:
+            plane = Aircraft(self.screen_width, self.screen_height)
+            self.planes.append(plane)
+            self.total_planes += 1
 
     def remove_plane(self, plane):
         self.planes.remove(plane)
 
     def render(self, mode='human'):
         print(
-            f"Time Step: {self.time_step} | Wind Speed: {self.wind_speed} | Wind Direction {self.wind_direction} | State: {self.current_state} | Action: {self.actions}")
+            f"Time Step: {self.time_step} | Wind Speed: {self.wind_speed} | Wind Direction {self.wind_direction} | Total Planes: {self.total_planes}")
