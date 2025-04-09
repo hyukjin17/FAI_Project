@@ -18,6 +18,8 @@ class Aircraft:
     def __init__(self, screen_width, screen_height):
         # Initialize a plane randomly either in air or at the gate
         self.flight_state = random.choice([0,3]) # 0: In Air, 1: Taxiway, 2: Runway, 3: At Gate
+        self.screen_width = screen_width
+        self.screen_height = screen_height
 
         # Select a random plane type
         self.plane_type = random.choice(list(self.PLANE_TYPES.keys()))
@@ -80,7 +82,7 @@ class Aircraft:
         omega = self.speed / self.turning_radius
         dtheta = omega
 
-        if (turn_direction == "left"):
+        if turn_direction == "left":
             cx = self.x - self.turning_radius * math.sin(self.direction)
             cy = self.y + self.turning_radius * math.cos(self.direction)
             self.change_direction(dtheta)
