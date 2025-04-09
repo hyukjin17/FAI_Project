@@ -1,5 +1,7 @@
+import math
+
 class Runway:
-    def __init__(self, x_start, y_start, x_end, y_end, direction, name="Runway"):
+    def __init__(self, x_start, y_start, x_end, y_end, x_entry, y_entry, direction, name="Runway"):
         """
         Initialize a runway.
 
@@ -15,6 +17,8 @@ class Runway:
         self.y_start = y_start
         self.x_end = x_end
         self.y_end = y_end
+        self.x_entry = x_entry
+        self.y_entry = y_entry
         self.direction = direction  # in radians
         self.name = name
         self.occupied = False  # Whether a plane is currently on the runway
@@ -38,6 +42,18 @@ class Runway:
         else:
             length = self.y_end - self.y_start
         return length
+    
+    def change_direction(self):
+        """Change runway direction."""
+        self.direction = (self.direction + math.pi) % (2 * math.pi)
+        if math.isclose(self.direction, 0, 0.001):
+            self.x_entry = self.x_start
+        elif math.isclose(self.direction, math.pi, 0.001):
+            self.x_entry = self.x_end
+        elif math.isclose(self.direction, math.pi/2, 0.001):
+            self.y_entry = self.y_end
+        elif math.isclose(self.direction, 3*math.pi/2, 0.001):
+            self.y_entry = self.y_start
 
     def __repr__(self):
         return f"{self.name}: ({self.x_start},{self.y_start}) -> ({self.x_end},{self.y_end}), direction {self.direction:.2f} rad"
