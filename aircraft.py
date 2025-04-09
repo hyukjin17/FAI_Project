@@ -31,8 +31,9 @@ class Aircraft:
         self.color = type_info["color"]
         self.direction = 0
         self.runway = None
-        self.takeoff = True if self.flight_state == 3 else False
-        self.update_turning_radius()
+        self.distance_to_runway = None
+        self.taking_off = False
+        self.turning_radius = self.update_turning_radius()
 
         if self.flight_state == 0:
             # Randomly spawn outside the screen
@@ -101,7 +102,7 @@ class Aircraft:
         if can_update_speed:
             self.speed += dv
             self.set_dx_dy(self.speed, self.direction)
-            self.update_turning_radius()
+            self.turning_radius = self.update_turning_radius()
 
     # Changes direction and updates the dx and dy
     def change_direction(self, direction):
@@ -127,14 +128,18 @@ class Aircraft:
         self.dx = 0
         self.dy = 0
 
-    # Calculate distance to another plane.
-    def distance_to(self, other_plane):
-        return math.sqrt((self.x - other_plane.x) ** 2 + (self.y - other_plane.y) ** 2)
+    # Calculate distance to another point.
+    def distance_to(self, x, y):
+        return math.sqrt((self.x - x) ** 2 + (self.y - y) ** 2)
 
     # Check if another plane is within a threshold distance.
     def is_close_to(self, other_plane, threshold):
-        return self.distance_to(other_plane) < threshold
+        return self.distance_to(other_plane.x, other_plane.y) < threshold
     
     # Update turning radius based on current speed.
     def update_turning_radius(self):
-        self.turning_radius = self.size * (self.speed / SPEED_FRACTION) ** 2
+        return self.size * (self.speed / SPEED_FRACTION) ** 2
+    
+    def assign_runway(self, runway):
+        self.runway = runway
+        self.distance_to_runway = self.distance_to(runway.x_entry, runway.y_entry)
