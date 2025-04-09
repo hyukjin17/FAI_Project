@@ -94,6 +94,8 @@ class Aircraft:
         self.dx = (speed / SPEED_FRACTION) * math.cos(direction)  # Normalize speed
         self.dy = (speed / SPEED_FRACTION) * math.sin(direction)
         
+    # Limit speed in air between min and max values
+    # At runway, taxiway or gate, the speed can get as low as 0
     def change_speed(self, dv):
         can_update_speed = (self.flight_state != 0 and (self.speed + dv < self.max_speed)) or (self.min_speed < self.speed + dv < self.max_speed)
         if can_update_speed:
@@ -101,11 +103,11 @@ class Aircraft:
             self.set_dx_dy(self.speed, self.direction)
             self.update_turning_radius()
 
+    # Changes direction and updates the dx and dy
     def change_direction(self, direction):
         if self.direction != direction:
             self.direction = (self.direction + direction) % (2 * np.pi)
             self.set_dx_dy(self.speed, self.direction)
-
 
     # Check if the plane has exited the screen
     def is_off_screen(self):
