@@ -17,7 +17,7 @@ class Aircraft:
 
     def __init__(self, screen_width, screen_height):
         # Initialize a plane randomly either in air or at the gate
-        self.flight_state = random.choice([0,3])
+        self.flight_state = random.choice([0,3]) # 0: In Air, 1: Taxiway, 2: Runway, 3: At Gate
 
         # Select a random plane type
         self.plane_type = random.choice(list(self.PLANE_TYPES.keys()))
@@ -26,12 +26,13 @@ class Aircraft:
         # Assign speed based on type
         self.speed = random.uniform(type_info["speed_range"][0], type_info["speed_range"][1])
         self.max_speed = type_info["speed_range"][1]
+        self.min_speed = type_info["speed_range"][0]
         self.size = type_info["size"]
         self.color = type_info["color"]
         self.direction = 0
         self.runway = None
         self.takeoff = True if self.flight_state == 3 else False
-        self.turning_radius = self.size * (self.speed / SPEED_FRACTION) * (self.speed / SPEED_FRACTION)
+        self.update_turning_radius()
 
         if self.flight_state == 0:
             # Randomly spawn outside the screen
@@ -94,10 +95,11 @@ class Aircraft:
         self.dy = (speed / SPEED_FRACTION) * math.sin(direction)
         
     def change_speed(self, dv):
-        if (self.speed + dv < self.max_speed):
+        can_update_speed = (self.flight_state != 0 and (self.speed + dv < self.max_speed)) or (self.min_speed < self.speed + dv < self.max_speed)
+        if can_update_speed:
             self.speed += dv
             self.set_dx_dy(self.speed, self.direction)
-            self.turning_radius = self.size * (self.speed / SPEED_FRACTION) * (self.speed / SPEED_FRACTION)
+            self.update_turning_radius()
 
     def change_direction(self, direction):
         if self.direction != direction:
@@ -116,3 +118,21 @@ class Aircraft:
         plane_type = list(self.PLANE_TYPES.keys()).index(self.plane_type)  # Assign integer value (index) to plane type
         speed = 0 if self.speed < 200 else 1 if self.speed < 400 else 3
         return np.array([0 if self.size < 5 else 1, speed, plane_type, self.flight_state], dtype=np.float32)
+    
+    # Set plane speed and velocity to 0.
+    def stop(self):
+        self.speed = 0
+        self.dx = 0
+        self.dy = 0
+
+    # Calculate distance to another plane.
+    def distance_to(self, other_plane):
+        return math.sqrt((self.x - other_plane.x) ** 2 + (self.y - other_plane.y) ** 2)
+
+    # Check if another plane is within a threshold distance.
+    def is_close_to(self, other_plane, threshold):
+        return self.distance_to(other_plane) < threshold
+    
+    # Update turning radius based on current speed.
+    def update_turning_radius(self):
+        self.turning_radius = self.size * (self.speed / SPEED_FRACTION) ** 2
