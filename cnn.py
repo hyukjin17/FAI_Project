@@ -8,24 +8,29 @@ class MultiPlaneCNN(nn.Module):
         super(MultiPlaneCNN, self).__init__()
         self.num_planes = num_planes
         self.num_actions = num_actions
-        
+
         self.conv_layers = nn.Sequential(
-            nn.Conv2d(7, 32, kernel_size=5, stride=1, padding=2),  # input channels = 7
+            nn.Conv2d(7, 16, kernel_size=3, stride=1, padding=1),  # (7, 80, 80) -> (16, 80, 80)
             nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(32, 64, kernel_size=5, stride=1, padding=2),
+            nn.MaxPool2d(2, 2),                                    # (16, 80, 80) -> (16, 40, 40)
+
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1), # (16, 40, 40) -> (32, 40, 40)
             nn.ReLU(),
-            nn.MaxPool2d(2, 2)
+            nn.MaxPool2d(2, 2),                                    # (32, 40, 40) -> (32, 20, 20)
+
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1), # (32, 20, 20) -> (64, 20, 20)
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),                                    # (64, 20, 20) -> (64, 10, 10)
         )
 
-        # Compute final flattened size
-        self.fc_input_size = 64 * 20 * 20  # Assuming (80x80 grid -> 20x20 after pooling twice)
+        self.fc_input_size = 64 * 10 * 10  # (after pooling)
 
         self.fc_layers = nn.Sequential(
-            nn.Linear(self.fc_input_size, 512),
+            nn.Linear(self.fc_input_size, 256),
             nn.ReLU(),
-            nn.Linear(512, num_planes * num_actions)  # (batch_size, num_planes, num_actions)
+            nn.Linear(256, num_planes * num_actions)  # Output for all planes and actions
         )
+
 
     def forward(self, x):
         x = self.conv_layers(x)
@@ -35,7 +40,7 @@ class MultiPlaneCNN(nn.Module):
         return x
     
 class MultiPlaneDQNAgent:
-    def __init__(self, num_planes, num_actions, gamma=0.99, lr=0.001):
+    def __init__(self, num_planes, num_actions, gamma=0.99, lr=0.002):
         self.model = MultiPlaneCNN(num_planes, num_actions)
         self.target_model = MultiPlaneCNN(num_planes, num_actions)
         self.target_model.load_state_dict(self.model.state_dict())
