@@ -83,7 +83,8 @@ for episode in range(num_episodes):
         agent.store_transition(state, actions, per_plane_rewards, next_state, done)
 
         # Train agent
-        agent.train(batch_size)
+        if steps_done % 4 == 0: # to speed up the training
+            agent.train(batch_size)
 
         # Track loss
         if hasattr(agent, 'loss_value'):
