@@ -1,7 +1,5 @@
 import numpy as np
-import torch
 import pygame
-import time
 import random
 from bradleyenv import BradleyAirportEnv
 from cnn import MultiPlaneDQNAgent
@@ -38,7 +36,6 @@ def render_env(env):
         pygame.draw.rect(
             screen, DARK_GRAY, (taxiway.x_start, taxiway.y_start, taxiway.x_end - taxiway.x_start, taxiway.y_end - taxiway.y_start))
         
-
     # Draw planes
     for plane in env.planes:
         pygame.draw.circle(screen, plane.color, (int(plane.x), int(plane.y)), plane.size)
@@ -52,27 +49,26 @@ def test_trained_agent():
     agent.load(model_path)
 
     # Reset environment
-    state = env.reset()
+    obs, _, _ = env.reset()
     state = env.generate_state_grid()
 
     done = False
-    max_steps = 500
+    max_steps = 1000
     step_count = 0
 
     setup_pygame()
     clock = pygame.time.Clock()
 
     while not done and step_count < max_steps:
-        # Add new planes at random
-        if random.random() < 0.05:
+        # Always maintain 5 planes
+        while len(env.planes) < env.max_aircraft:
             env.add_plane()
 
         # Select actions (purely greedy, no randomness)
         actions = agent.select_actions(state, epsilon=0.0)
 
         # Step environment
-        next_state, reward, done, info = env.step(actions)
-        next_state = env.generate_state_grid()
+        next_state, total_reward, per_plane_rewards, done = env.step(actions)
 
         # Render the environment
         render_env(env)

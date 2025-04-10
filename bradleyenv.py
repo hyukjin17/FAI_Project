@@ -2,7 +2,6 @@ import gym
 from gym import spaces
 import numpy as np
 import random
-import pygame
 from aircraft import Aircraft
 from taxiway import Taxiway
 from runway import Runway
@@ -97,6 +96,8 @@ class BradleyAirportEnv(gym.Env):
     def reset(self):
         self.planes = []
         self.total_planes = 0
+        for _ in range(self.max_aircraft):
+            self.add_plane()
         obs = self.generate_state_grid()
         self.time_step = 0
         return obs, 0, False
@@ -118,11 +119,11 @@ class BradleyAirportEnv(gym.Env):
             self.remove_plane(plane)
             reward -= 300   # large penalty for going out of screen
 
-        if plane.runway == None and plane.flight_state == 0:
+        if plane.runway is None and plane.flight_state == 0:
             return 0
         
         runway = plane.runway
-        if abs(plane.direction - runway.direction) < np.pi/4:
+        if runway is not None and abs(plane.direction - runway.direction) < np.pi/4:
             reward += 5  # Small shaping bonus for good early alignment
         
         if plane.flight_state == 0:
@@ -134,7 +135,7 @@ class BradleyAirportEnv(gym.Env):
                 reward -= 2 # penalty for moving towards an occupied runway
             if plane.distance_to_runway < 5:
                 plane.flight_state = 2
-        elif plane.flight_state == 2: # on runway
+        elif plane.flight_state == 2 and runway is not None: # on runway
             if runway.on_runway(plane.x, plane.y):
                 reward += 5 # reward for staying on the runway
             if plane.speed != 0 and plane.runway is not None:
@@ -206,7 +207,7 @@ class BradleyAirportEnv(gym.Env):
             reward += self.move_action(plane, action)
         elif action in [4, 5, 6, 7]:  # Assign runway
             reward += self.assign_runway(plane, action)
-        elif action == 8 and plane.flight_state == 2:   # Taxi
+        elif action == 8 and plane.flight_state == 2 and plane.runway is not None:   # Taxi
             if plane.speed != 0:
                 reward -= 50    # penalty for assigning a taxiway when the aircraft is not stopped
             if plane.runway.name == "Runway 0":
@@ -239,7 +240,7 @@ class BradleyAirportEnv(gym.Env):
         # Check for collisions
         collisions = self.check_grid_collisions(obs)
         reward -= collisions * 1000
-        if collisions > 0:
+        if collisions > 0 or self.total_planes == 10:
             done = True
 
         if plane.runway is not None:
@@ -260,12 +261,27 @@ class BradleyAirportEnv(gym.Env):
         return obs, reward, done
 
     def step(self, actions):
+        while len(self.planes) < self.max_aircraft:
+            self.add_plane()
+
+        obs = self.generate_state_grid()
+        per_plane_rewards = []
+        done = False
+
         for plane_index, action in enumerate(actions):
             if plane_index >= len(self.planes):
                 continue  # Skip if action is for non-existing plane
             plane = self.planes[plane_index]
             obs, reward, done = self.execute_action(plane, action)
-        return obs, reward, done
+            per_plane_rewards.append(reward)
+
+        # padding values just in case
+        while len(per_plane_rewards) < self.max_aircraft:
+            per_plane_rewards.append(0)
+
+        # Global reward = sum of all planes
+        total_reward = sum(per_plane_rewards)
+        return obs, total_reward, per_plane_rewards, done
             
     
     def generate_state_grid(self):
