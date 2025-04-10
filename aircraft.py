@@ -16,8 +16,8 @@ class Aircraft:
     }
 
     def __init__(self, screen_width, screen_height):
-        # Initialize a plane randomly either in air or at the gate
-        self.flight_state = random.choice([0,3]) # 0: In Air, 1: Taxiway, 2: Runway, 3: At Gate
+        # Initialize a plane in air
+        self.flight_state = 0   # 0: In Air, 1: Taxiway, 2: Runway, 3: At Gate
         self.screen_width = screen_width
         self.screen_height = screen_height
 
@@ -46,25 +46,25 @@ class Aircraft:
                 if self.y < screen_height / 2:
                     self.direction = random.uniform(0, np.pi / 4)
                 else:
-                    self.direction = random.uniform(2*np.pi, 7*np.pi / 4)
+                    self.direction = random.uniform(7*np.pi / 4, 2*np.pi)
             elif edge == "right":
                 self.x, self.y = screen_width + 10, random.randint(0, screen_height)
                 if self.y < screen_height / 2:
                     self.direction = random.uniform(3 * np.pi / 4, np.pi)
                 else:
-                    self.direction = random.uniform(5 * np.pi / 4, np.pi)
+                    self.direction = random.uniform(np.pi, 5 * np.pi / 4)
             elif edge == "top":
                 self.x, self.y = random.randint(0, screen_width), -10
                 if self.x < screen_width / 2:
-                    self.direction = random.uniform(3 * np.pi / 2, 7 * np.pi / 4)
-                else:
-                    self.direction = random.uniform(5 * np.pi / 4, 3 * np.pi / 2)
-            else:  # "bottom"
-                self.x, self.y = random.randint(0, screen_width), screen_height + 10
-                if self.x < screen_height / 2:
                     self.direction = random.uniform(np.pi / 4, np.pi / 2)
                 else:
                     self.direction = random.uniform(np.pi / 2, 3 * np.pi / 4)
+            else:  # "bottom"
+                self.x, self.y = random.randint(0, screen_width), screen_height + 10
+                if self.x < screen_height / 2:
+                    self.direction = random.uniform(3 * np.pi / 2, 7 * np.pi / 4)
+                else:
+                    self.direction = random.uniform(5 * np.pi / 4, 3 * np.pi / 2)
         else:
             # Set to the position of the airport
             self.x, self.y = 50, 50
@@ -78,20 +78,17 @@ class Aircraft:
         self.x += self.dx
         self.y += self.dy
 
+    # Update the plane's direction angle proportionally based on speed and turning radius.
+    # Does not move the plane's position.
+    # Args:
+    #     turn_direction (str): "left" or "right"
     def turn(self, turn_direction):
         omega = self.speed / self.turning_radius
-        dtheta = omega
-
+        dtheta = omega / 30 # assuming the time step is 1/30 (30 fps)
         if turn_direction == "left":
-            cx = self.x - self.turning_radius * math.sin(self.direction)
-            cy = self.y + self.turning_radius * math.cos(self.direction)
-            self.change_direction(dtheta)
-        else:
-            cx = self.x + self.turning_radius * math.sin(self.direction)
-            cy = self.y - self.turning_radius * math.cos(self.direction)
             self.change_direction(-dtheta)
-        self.x = cx + self.turning_radius * math.cos(self.direction)
-        self.y = cy + self.turning_radius * math.sin(self.direction)
+        else: # turn right
+            self.change_direction(dtheta)
         
     def set_dx_dy(self, speed, direction):
         self.dx = (speed / SPEED_FRACTION) * math.cos(direction)  # Normalize speed
@@ -100,29 +97,28 @@ class Aircraft:
     # Limit speed in air between min and max values
     # At runway, taxiway or gate, the speed can get as low as 0
     def change_speed(self, dv):
-        can_update_speed = (self.flight_state != 0 and (self.speed + dv < self.max_speed)) or (self.min_speed < self.speed + dv < self.max_speed)
+        can_update_speed = (
+            self.flight_state != 0 and (0 < self.speed + dv < self.max_speed)) or (
+            self.min_speed < self.speed + dv < self.max_speed)
         if can_update_speed:
             self.speed += dv
             self.set_dx_dy(self.speed, self.direction)
             self.turning_radius = self.update_turning_radius()
 
-    # Changes direction and updates the dx and dy
-    def change_direction(self, direction):
-        if self.direction != direction:
-            self.direction = (self.direction + direction) % (2 * np.pi)
-            self.set_dx_dy(self.speed, self.direction)
+    # Changes direction by a given angle and updates the dx and dy
+    def change_direction(self, angle):
+        self.direction = (self.direction + angle) % (2 * np.pi)
+        self.set_dx_dy(self.speed, self.direction)
+
+    # Changes direction to a given direction and updates the dx and dy
+    def set_direction(self, direction):
+        self.direction = direction
+        self.set_dx_dy(self.speed, self.direction)
 
     # Check if the plane has exited the screen
     def is_off_screen(self):
         return (self.x < -10 or self.x > self.screen_width + 10 or
                 self.y < -10 or self.y > self.screen_height + 10)
-
-    # Current state of the plane
-    # May need to add more info (like nearby planes)
-    def get_obs(self):
-        plane_type = list(self.PLANE_TYPES.keys()).index(self.plane_type)  # Assign integer value (index) to plane type
-        speed = 0 if self.speed < 200 else 1 if self.speed < 400 else 3
-        return np.array([0 if self.size < 5 else 1, speed, plane_type, self.flight_state], dtype=np.float32)
     
     # Set plane speed and velocity to 0.
     def stop(self):
@@ -140,7 +136,7 @@ class Aircraft:
     
     # Update turning radius based on current speed.
     def update_turning_radius(self):
-        return self.size * (self.speed / SPEED_FRACTION) ** 2
+        return 2 * self.size * (self.speed / SPEED_FRACTION) ** 2
     
     def assign_runway(self, runway):
         self.runway = runway
