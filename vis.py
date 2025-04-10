@@ -3,6 +3,7 @@ import sys
 import time
 import math
 from bradleyenv import BradleyAirportEnv
+from aircraft import Aircraft
 
 WIDTH, HEIGHT = 800, 800
 
@@ -76,7 +77,8 @@ def main():
                         for plane in game.planes:
                             plane.move()
                     if event.key == pygame.K_z:
-                        game.add_plane()
+                        plane = Aircraft(WIDTH, HEIGHT)
+                        game.add_plane(plane)
                     if action is not None:
                         if selected_plane_index < len(game.planes):
                             actions = [12] * len(game.planes)
@@ -88,13 +90,15 @@ def main():
         screen.fill(BLACK)
 
         # Draw runways
-        pygame.draw.rect(screen, GRAY, (100, 200, 300, 10))
-        pygame.draw.rect(screen, GRAY, (200, 100, 10, 300))
+        for runway in game.runways:
+            pygame.draw.rect(
+                screen, GRAY, (runway.x_start, runway.y_start, runway.x_end - runway.x_start, runway.y_end - runway.y_start))
 
         # Draw taxiways
-        pygame.draw.rect(screen, DARK_GRAY, (80, 200, 10, 150))
-        pygame.draw.rect(screen, DARK_GRAY, (200, 80, 150, 10))
-
+        for taxiway in game.taxiways:
+            pygame.draw.rect(
+                screen, DARK_GRAY, (taxiway.x_start, taxiway.y_start, taxiway.x_end - taxiway.x_start, taxiway.y_end - taxiway.y_start))
+        
         # Draw planes
         for idx, plane in enumerate(game.planes):
             pos = (int(plane.x), int(plane.y))
@@ -107,7 +111,7 @@ def main():
 
             # Draw plane index
             label = font.render(str(idx), True, WHITE)
-            screen.blit(label, (pos[0] + 10, pos[1] - 10))
+            screen.blit(label, (pos[0] + 15, pos[1] - 15))
 
         # Draw wind direction
         wind_dir = game.wind_direction
