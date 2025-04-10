@@ -48,7 +48,7 @@ class BradleyAirportEnv(gym.Env):
             x_start=200, y_start=100,
             x_end=210, y_end=600,
             x_entry = 205, y_entry = 600, # entrance to runway based on direction
-            direction = 3*math.pi / 2,  # Facing NORTH (90 degrees = π/2 radians)
+            direction = 3*math.pi / 2,  # Facing NORTH (90 degrees = pi/2 radians)
             name="Runway 1"
         )
         # Create 2 Taxiway objects
