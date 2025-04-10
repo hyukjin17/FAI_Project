@@ -68,7 +68,7 @@ class MultiPlaneDQNAgent:
                 q_values = self.model(state_tensor)  # (1, num_planes, num_actions)
             q_values = q_values.squeeze(0)  # (num_planes, num_actions)
 
-            actions = q_values.argmax(dim=2)
+            actions = q_values.argmax(dim=1)
             actions = actions.squeeze(0).cpu().numpy()
         return actions
 
