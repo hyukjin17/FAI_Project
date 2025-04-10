@@ -8,13 +8,13 @@ from cnn import MultiPlaneDQNAgent
 # Hyperparameters
 num_planes = 5
 num_actions = 13
-num_episodes = 500
+num_episodes = 5000
 batch_size = 32
 epsilon_start = 1.0
-epsilon_end = 0.05
-epsilon_decay = 0.995
+epsilon_end = 0.1
+epsilon_decay = 0.9995
 target_update_freq = 1000  # steps
-max_steps_per_episode = 500
+max_steps_per_episode = 10000
 
 # Initialize environment and agent
 env = BradleyAirportEnv()
