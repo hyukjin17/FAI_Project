@@ -1,9 +1,10 @@
 import numpy as np
-import torch
 import matplotlib.pyplot as plt
 from IPython.display import clear_output
 from bradleyenv import BradleyAirportEnv
 from cnn import MultiPlaneDQNAgent
+import random
+import time
 
 # Hyperparameters
 num_planes = 5
@@ -13,12 +14,36 @@ batch_size = 32
 epsilon_start = 1.0
 epsilon_end = 0.1
 epsilon_decay = 0.9995
-target_update_freq = 1000  # steps
+target_update_freq = 500  # steps
 max_steps_per_episode = 10000
+
+# Rendering parameters
+RENDER = False            # Toggle rendering ON or OFF
+RENDER_EVERY_N_EPISODES = 50
+SLEEP_TIME = 0.01         # Sleep 10ms to make rendering smoother
 
 # Initialize environment and agent
 env = BradleyAirportEnv()
 agent = MultiPlaneDQNAgent(num_planes, num_actions)
+
+# state, _, _ = env.reset()
+# state = env.generate_state_grid()
+
+# while len(agent.memory) < batch_size:
+#     # Add new planes at random
+#     if random.random() < 0.05:
+#         env.add_plane()
+
+#     # Fill memory with random actions
+#     actions = agent.select_actions(state, epsilon=1.0)  # Take completely random actions
+#     next_state, reward, done = env.step(actions)
+#     agent.store_transition(state, actions, reward, next_state, done)
+#     state = next_state
+
+#     if done:
+#         state, _, _ = env.reset()
+#         state = env.generate_state_grid()
+
 
 # Setup tracking
 episode_rewards = []
@@ -27,42 +52,35 @@ losses = []
 epsilon = epsilon_start
 steps_done = 0
 
+plt.ion()  # turn interactive mode ON
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,5))
+
 for episode in range(num_episodes):
     state, _, _ = env.reset()
     done = False
     total_reward = 0
-    step_in_episode = 0
+    steps_in_episode = 0
 
     # Initial state grid
     state = env.generate_state_grid()
 
-    while not done and step_in_episode < max_steps_per_episode:
-        # Make sure enough planes are in the environment
-        while len(env.planes) < num_planes:
+    while not done and steps_in_episode < max_steps_per_episode:
+        # Add new planes at random
+        if len(env.planes) < num_planes:
             env.add_plane()
 
         # Select actions
         actions = agent.select_actions(state, epsilon)
 
         # Step environment safely
-        env.step(actions)
+        next_state, step_reward_sum, per_plane_rewards, done = env.step(actions)
 
-        # Observe next state
-        next_state = env.generate_state_grid()
-
-        # Reward can be summed from planes
-        reward = 0
-        for plane in env.planes:
-            reward += 1  # +1 reward per alive plane, you can customize
-
-        # Check if episode is done
-        done = all(plane.flight_state == 3 for plane in env.planes)  # All planes at gate
-        # Or done if no planes
-        if len(env.planes) == 0:
-            done = True
-
+        if RENDER and episode % RENDER_EVERY_N_EPISODES == 0:
+            env.render()
+            time.sleep(SLEEP_TIME)  # Small pause to see movement
+        
         # Store experience
-        agent.store_transition(state, actions, reward, next_state, done)
+        agent.store_transition(state, actions, per_plane_rewards, next_state, done)
 
         # Train agent
         agent.train(batch_size)
@@ -73,9 +91,9 @@ for episode in range(num_episodes):
 
         # Update for next step
         state = next_state
-        total_reward += reward
+        total_reward += sum(per_plane_rewards)
         steps_done += 1
-        step_in_episode += 1
+        steps_in_episode += 1
 
         # Update target network
         if steps_done % target_update_freq == 0:
@@ -88,24 +106,22 @@ for episode in range(num_episodes):
 
     # Plot rewards and losses every 10 episodes
     if episode % 10 == 0:
-        clear_output(wait=True)
-        plt.figure(figsize=(12,5))
+        ax1.clear()
+        ax2.clear()
         
-        plt.subplot(1,2,1)
-        plt.title('Rewards')
-        plt.plot(episode_rewards)
-        plt.xlabel('Episode')
-        plt.ylabel('Total Reward')
+        ax1.set_title('Rewards')
+        ax1.plot(episode_rewards)
+        ax1.set_xlabel('Episode')
+        ax1.set_ylabel('Total Reward')
 
-        plt.subplot(1,2,2)
-        plt.title('Loss')
-        plt.plot(losses)
-        plt.xlabel('Training Step')
-        plt.ylabel('Loss')
+        ax2.set_title('Loss')
+        ax2.plot(losses)
+        ax2.set_xlabel('Training Step')
+        ax2.set_ylabel('Loss')
 
-        plt.show()
+        plt.pause(0.001)  # short pause so matplotlib refreshes
 
-    print(f"Episode {episode+1}/{num_episodes} | Total Reward: {total_reward:.2f} | Epsilon: {epsilon:.3f}")
+    print(f"Episode {episode+1}/{num_episodes} | Total Reward: {total_reward:.2f} | Steps = {steps_in_episode} | Epsilon: {epsilon:.3f}")
 
 # Save model at the end
 agent.save("dqn_airport_final.pth")
