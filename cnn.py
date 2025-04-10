@@ -66,7 +66,7 @@ class MultiPlaneDQNAgent:
             state_tensor = torch.tensor(np.array(state)).float().unsqueeze(0).to(self.device) # (1, channels, H, W)
             with torch.no_grad():
                 q_values = self.model(state_tensor)  # (1, num_planes, num_actions)
-            q_values = q_values.squeeze(0).cpu().numpy()  # (num_planes, num_actions)
+            q_values = q_values.squeeze(0)  # (num_planes, num_actions)
 
             actions = q_values.argmax(dim=2)
             actions = actions.squeeze(0).cpu().numpy()
