@@ -9,12 +9,12 @@ import time
 # Hyperparameters
 num_planes = 5
 num_actions = 13
-num_episodes = 5000
-batch_size = 32
+num_episodes = 10000
+batch_size = 64
 epsilon_start = 1.0
 epsilon_end = 0.1
 epsilon_decay = 0.9995
-target_update_freq = 50  # steps
+target_update_freq = 500  # steps
 max_steps_per_episode = 10000
 
 # Rendering parameters
