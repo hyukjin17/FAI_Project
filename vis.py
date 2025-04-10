@@ -3,7 +3,6 @@ import sys
 import time
 import math
 from bradleyenv import BradleyAirportEnv
-from aircraft import Aircraft
 
 WIDTH, HEIGHT = 800, 800
 
@@ -77,8 +76,7 @@ def main():
                         for plane in game.planes:
                             plane.move()
                     if event.key == pygame.K_z:
-                        plane = Aircraft(WIDTH, HEIGHT)
-                        game.add_plane(plane)
+                        game.add_plane()
                     if action is not None:
                         if selected_plane_index < len(game.planes):
                             actions = [12] * len(game.planes)

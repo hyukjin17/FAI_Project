@@ -4,7 +4,6 @@ import pygame
 import time
 import random
 from bradleyenv import BradleyAirportEnv
-from aircraft import Aircraft
 from cnn import MultiPlaneDQNAgent
 
 # Hyperparameters
@@ -66,8 +65,7 @@ def test_trained_agent():
     while not done and step_count < max_steps:
         # Add new planes at random
         if random.random() < 0.05:
-            plane = Aircraft(WIDTH, HEIGHT)
-            env.add_plane(plane)
+            env.add_plane()
 
         # Select actions (purely greedy, no randomness)
         actions = agent.select_actions(state, epsilon=0.0)

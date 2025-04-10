@@ -37,8 +37,6 @@ class BradleyAirportEnv(gym.Env):
         self.planes = []
         self.time_step = 0
 
-        plane = Aircraft(self.screen_width, self.screen_height)
-
         # Create two Runway objects
         runway_horizontal = Runway(
             x_start=100, y_start=200,
@@ -94,7 +92,7 @@ class BradleyAirportEnv(gym.Env):
         }
 
         self.reset()
-        self.add_plane(plane)
+        self.add_plane()
 
     def reset(self):
         self.planes = []
@@ -299,8 +297,9 @@ class BradleyAirportEnv(gym.Env):
         return state
 
     # Add a new plane to the environment
-    def add_plane(self, plane):
+    def add_plane(self):
         if len(self.planes) < self.max_aircraft:
+            plane = Aircraft(self.screen_width, self.screen_height)
             self.planes.append(plane)
             self.total_planes += 1
 
