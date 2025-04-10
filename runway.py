@@ -46,14 +46,18 @@ class Runway:
     def change_direction(self):
         """Change runway direction."""
         self.direction = (self.direction + math.pi) % (2 * math.pi)
-        if math.isclose(self.direction, 0, 0.001):
+        if math.isclose(self.direction, 0, abs_tol=0.001):
             self.x_entry = self.x_start
-        elif math.isclose(self.direction, math.pi, 0.001):
+        elif math.isclose(self.direction, math.pi, abs_tol=0.001):
             self.x_entry = self.x_end
-        elif math.isclose(self.direction, math.pi/2, 0.001):
-            self.y_entry = self.y_end
-        elif math.isclose(self.direction, 3*math.pi/2, 0.001):
+        elif math.isclose(self.direction, math.pi/2, abs_tol=0.001):
             self.y_entry = self.y_start
+        elif math.isclose(self.direction, 3*math.pi/2, abs_tol=0.001):
+            self.y_entry = self.y_end
+
+    def on_runway(self, x, y):
+        """Checks whether a point is on a runway"""
+        return self.x_start < x < self.x_end and self.y_start < y < self.y_end
 
     def __repr__(self):
         return f"{self.name}: ({self.x_start},{self.y_start}) -> ({self.x_end},{self.y_end}), direction {self.direction:.2f} rad"
