@@ -52,8 +52,8 @@ losses = []
 epsilon = epsilon_start
 steps_done = 0
 
-plt.ion()  # turn interactive mode ON
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,5))
+# plt.ion()  # turn interactive mode ON
+# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,5))
 
 for episode in range(num_episodes):
     state, _, _ = env.reset()
@@ -104,22 +104,22 @@ for episode in range(num_episodes):
 
     episode_rewards.append(total_reward)
 
-    # Plot rewards and losses every 10 episodes
-    if episode % 10 == 0:
-        ax1.clear()
-        ax2.clear()
+    # # Plot rewards and losses every 10 episodes
+    # if episode % 10 == 0:
+    #     ax1.clear()
+    #     ax2.clear()
         
-        ax1.set_title('Rewards')
-        ax1.plot(episode_rewards)
-        ax1.set_xlabel('Episode')
-        ax1.set_ylabel('Total Reward')
+    #     ax1.set_title('Rewards')
+    #     ax1.plot(episode_rewards)
+    #     ax1.set_xlabel('Episode')
+    #     ax1.set_ylabel('Total Reward')
 
-        ax2.set_title('Loss')
-        ax2.plot(losses)
-        ax2.set_xlabel('Training Step')
-        ax2.set_ylabel('Loss')
+    #     ax2.set_title('Loss')
+    #     ax2.plot(losses)
+    #     ax2.set_xlabel('Training Step')
+    #     ax2.set_ylabel('Loss')
 
-        plt.pause(0.001)  # short pause so matplotlib refreshes
+    #     plt.pause(0.001)  # short pause so matplotlib refreshes
 
     print(f"Episode {episode+1}/{num_episodes} | Total Reward: {total_reward:.2f} | Steps = {steps_in_episode} | Epsilon: {epsilon:.3f}")
 
