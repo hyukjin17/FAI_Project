@@ -240,7 +240,7 @@ class BradleyAirportEnv(gym.Env):
         # Check for collisions
         collisions = self.check_grid_collisions(obs)
         reward -= collisions * 1000
-        if collisions > 0 or self.total_planes == 10:
+        if collisions > 0 or self.total_planes == 50:
             done = True
 
         if plane.runway is not None:
