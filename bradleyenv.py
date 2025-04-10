@@ -4,6 +4,7 @@ import numpy as np
 import random
 import pygame
 from aircraft import Aircraft
+from taxiway import Taxiway
 from runway import Runway
 import math
 
@@ -36,27 +37,41 @@ class BradleyAirportEnv(gym.Env):
         self.planes = []
         self.time_step = 0
 
+        plane = Aircraft(self.screen_width, self.screen_height)
 
         # Create two Runway objects
         runway_horizontal = Runway(
             x_start=100, y_start=200,
-            x_end=400, y_end=210,  # x_start + width, y_start + height
+            x_end=400, y_end=210,
             x_entry = 100, y_entry = 205, # entrance to runway based on direction
             direction=0.0,  # Facing EAST (0 radians)
             name="Runway 0"
         )
-
         runway_vertical = Runway(
             x_start=200, y_start=100,
-            x_end=210, y_end=600,  # x_start + width, y_start + height
+            x_end=210, y_end=600,
             x_entry = 205, y_entry = 600, # entrance to runway based on direction
-            direction = math.pi / 2,  # Facing NORTH (90 degrees = π/2 radians)
+            direction = 3*math.pi / 2,  # Facing NORTH (90 degrees = π/2 radians)
             name="Runway 1"
+        )
+        # Create 2 Taxiway objects
+        taxiway_horizontal = Taxiway(
+            x_start=180, y_start=250,
+            x_end=190, y_end=400,
+            name="Taxiway 0"
+        )
+        taxiway_vertical = Taxiway(
+            x_start=230, y_start=180,
+            x_end=380, y_end=190,
+            name="Taxiway 1"
         )
 
         self.runways = [runway_horizontal, runway_vertical]
-        self.wind_speed = [0, 1]  # Low or High
-        self.wind_directions = [np.pi/2, np.pi/4, 0, 7*np.pi/4, 3*np.pi/2, 5*np.pi/4, np.pi, 3*np.pi/4]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
+        self.taxiways = [taxiway_horizontal, taxiway_vertical]
+
+        self.wind_speeds = [0, 1]  # Low or High
+        self.wind_speed = 0
+        self.wind_directions = [3*np.pi/2, 7*np.pi/4, 0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi, 5*np.pi/4]  # North, NorthEast, East, SouthEast, South, SouthWest, West, NorthWest
         self.wind_direction = random.choice(self.wind_directions)
 
         # Action Space
@@ -79,7 +94,7 @@ class BradleyAirportEnv(gym.Env):
         }
 
         self.reset()
-        self.add_plane()
+        self.add_plane(plane)
 
     def reset(self):
         self.planes = []
@@ -88,75 +103,127 @@ class BradleyAirportEnv(gym.Env):
         self.time_step = 0
         return obs, 0, False
     
-    def move(self, plane, action):
-        crosswind = self.is_within_pi(self.wind_direction, plane.direction)
-        if plane.runway == 0:
-            correct_landing_angle = True if 7*np.pi/4 < plane.direction < 2*np.pi or 0 < plane.direction < np.pi/4 else False
-        elif plane.runway == 1:
-            correct_landing_angle = True if 3*np.pi/4 < plane.direction < 5*np.pi/4 else False
-        elif plane.runway == 2:
-            correct_landing_angle = True if np.pi/4 < plane.direction < 3*np.pi/4 else False
-        elif plane.runway == 3:
-            correct_landing_angle = True if 5*np.pi/4 < plane.direction < 7*np.pi/4 else False
-        if (plane.runway in [0,1] and 100 < plane.x < 400 and 200 < plane.y < 210) or (
-            plane.runway in [2,3] and 100 < plane.y < 400 and 200 < plane.x < 210):
-            plane.flight_state, self.current_state = 2, 2
-            return -200 if not correct_landing_angle else 100 if crosswind and self.wind_speed == 0 else -100
-        
+
+    def move_action(self, plane, action):
         if action == 0: # turn left
             plane.turn("left")
         elif action == 1: # turn right
             plane.turn("right")
         elif action == 2: # speed up
             plane.change_speed(10)
-            plane.move()
         elif action == 3: # slow down
             plane.change_speed(-10)
-            plane.move()
-        elif action == 12:
-            plane.move()
-        return 0
+
+        reward = 0
+        
+        if plane.is_off_screen():
+            self.remove_plane(plane)
+            reward -= 300   # large penalty for going out of screen
+
+        if plane.runway == None and plane.flight_state == 0:
+            return 0
+        
+        runway = plane.runway
+        if abs(plane.direction - runway.direction) < np.pi/4:
+            reward += 5  # Small shaping bonus for good early alignment
+        
+        if plane.flight_state == 0:
+            k_penalty = 0.01 # constants for penalty and reward (based on distance to runway)
+            k_bonus = 10.0
+            reward -= k_penalty * plane.distance_to_runway  # Mild penalty for being far away
+            reward += k_bonus / (plane.distance_to_runway + 1)  # Big bonus for getting very close
+            if plane.distance_to_runway < 100 and runway.is_occupied():
+                reward -= 2 # penalty for moving towards an occupied runway
+            if plane.distance_to_runway < 5:
+                plane.flight_state = 2
+        elif plane.flight_state == 2: # on runway
+            if runway.on_runway(plane.x, plane.y):
+                reward += 5 # reward for staying on the runway
+            if plane.speed != 0 and plane.runway is not None:
+                reward -= plane.speed   # incentivize decelerating to a full stop immediately after landing
+            else:
+                if runway.name == "Runway 0":
+                    taxiway = self.taxiways[0]
+                else:
+                    taxiway = self.taxiways[1]
+                reward -= taxiway.distance_to_center(plane.x, plane.y)  # penalty for being away from taxiway after landing
+                if taxiway.close_to(plane.x, plane.y):
+                    plane.flight_state = 1
+                    plane.stop()
+                    reward += 20    # small reward for getting to the taxiway
+        elif plane.flight_state == 1:
+            reward -= 10 # penalty for assigning a move action on a taxiway
+
+        return reward   # reward roughly between -5 and 5
     
-    def is_within_pi(self, theta1, theta2):
+
+    def is_within_angle(self, theta1, theta2, threshold):
         delta_theta = theta1 - theta2
-        delta_theta = (delta_theta + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
-        return abs(delta_theta) <= np.pi
+        delta_theta = (delta_theta + np.pi) % (2 * np.pi) - np.pi  # Normalize
+        return abs(delta_theta) <= threshold
     
+
     # assigns runway and landing direction
     def assign_runway(self, plane, action):
+        """Need a way to change the runway direction if the wind direction is variable"""
+        if plane.runway is not None and (
+            (action in [4,5] and plane.runway.name == "Runway 0") or (
+            action in [6,7] and plane.runway.name == "Runway 1")):
+            return 0    # avoid duplicate rewards
+        reward = 0
         if action == 4 or action == 5:
             plane.assign_runway(self.runways[0])
             # change direction if not already set correctly based on action
-            if (action == 4 and math.isclose(self.runways[0].direction, math.pi, 0.001)) or (
-                action == 5 and math.isclose(self.runways[0].direction, 0, 0.001)):
+            if (action == 4 and math.isclose(self.runways[0].direction, math.pi, abs_tol=0.001)) or (
+                action == 5 and math.isclose(self.runways[0].direction, 0, abs_tol=0.001)):
                 self.runways[0].change_direction()
         elif action == 6 or action == 7:
             plane.assign_runway(self.runways[1])
             # change direction if not already set correctly based on action
-            if (action == 6 and math.isclose(self.runways[1].direction, 3*math.pi/2, 0.001)) or (
-                action == 7 and math.isclose(self.runways[1].direction, math.pi/2, 0.001)):
+            if (action == 7 and math.isclose(self.runways[1].direction, 3*math.pi/2, abs_tol=0.001)) or (
+                action == 6 and math.isclose(self.runways[1].direction, math.pi/2, abs_tol=0.001)):
                 self.runways[1].change_direction()
+        if plane.size > 5 and action in [4, 5]:  # Large aircraft on short runway
+            reward -= 100   # Penalty for landing on the wrong runway
+        else:
+            reward += 100   # Reward for assigning the runway correctly
+        return reward
+    
 
+    # Checks whether there are collisions on the grid and returns the number of collisions
+    def check_grid_collisions(self, state_grid):
+        plane_layer = state_grid[CHANNELS['plane_presence']]
+        collision_cells = plane_layer > 1
+        num_collisions = np.sum(collision_cells)
+        return num_collisions
+        
+
+    # Assign an action to a plane
     def execute_action(self, plane, action):
         reward = 0
         done = False
         self.time_step += 1
-        
+
         if action in [0, 1, 2, 3, 12]:  # Moving or changing direction
-            reward = self.move(plane, action)
-
+            reward += self.move_action(plane, action)
         elif action in [4, 5, 6, 7]:  # Assign runway
-            if plane.size > 5 and action in [4, 5]:  # Large aircraft on short runway
-                reward -= 100  # Penalty for landing on the wrong runway
+            reward += self.assign_runway(plane, action)
+        elif action == 8 and plane.flight_state == 2:   # Taxi
+            if plane.speed != 0:
+                reward -= 50    # penalty for assigning a taxiway when the aircraft is not stopped
+            if plane.runway.name == "Runway 0":
+                taxiway = self.taxiways[0]
             else:
-                # Update runway assignment
-                reward = self.assign_runway(plane, action)
-
-        elif action in [8, 9]:  # Taxi
-            self.state[7] = action - 8  # Move to taxiway
+                taxiway = self.taxiways[1]
             plane.runway = None
-            # Need to move to taxiway and set new state
-
+            if not taxiway.is_occupied():
+                x,y = taxiway.get_center()
+                direction = math.atan2(y - plane.y, x - plane.x)
+                plane.set_direction(direction)
+        elif action == 9:   # Go to gate
+            if plane.flight_state == 1: # if on taxiway
+                reward += 100   # reward for getting to gate
+                self.remove_plane(plane)
         elif action == 10:  # Wait
             if plane.flight_state == 0:
                 plane.turn("right")
@@ -166,20 +233,24 @@ class BradleyAirportEnv(gym.Env):
 
         elif action == 11: # Takeoff
             pass
-            # need to make sure state is updated and plane starts to move
+            # currently not used since all planes are starting in air
 
         plane.move() # Move the plane at each time step
         obs = self.generate_state_grid()
 
-        # Check if aircraft is landing at too sharp an angle
-        landing_angle = random.randint(-60, 60)  # landing angle
-        if plane.flight_state == 0 and not (-45 <= landing_angle <= 45):
-            reward -= 200  # Penalty for sharp landing
-
         # Check for collisions
-        if random.random() < 0.05:  # Simulated 5% chance of aircraft collision
-            reward -= 1000  # Major penalty for crashes
+        collisions = self.check_grid_collisions(obs)
+        reward -= collisions * 1000
+        if collisions > 0:
             done = True
+
+        if plane.runway is not None:
+            crosswind = self.is_within_angle(self.wind_direction, plane.direction, np.pi/2)
+            correct_landing_angle = self.is_within_angle(plane.runway.direction, plane.direction, np.pi/4)
+            if (plane.runway.name == "Runway 0" and 100 < plane.x < 400 and 200 < plane.y < 210) or (
+                plane.runway.name == "Runway 1" and 100 < plane.y < 600 and 200 < plane.x < 210):
+                plane.flight_state = 2
+                reward += (-200) if not correct_landing_angle else 100 if crosswind and self.wind_speed == 0 else -100
 
         all_landed = True
         # checks if all planes have been assigned to gates
@@ -195,9 +266,9 @@ class BradleyAirportEnv(gym.Env):
             if plane_index >= len(self.planes):
                 continue  # Skip if action is for non-existing plane
             plane = self.planes[plane_index]
-            self.execute_action(plane, action)
-            if plane.is_off_screen():
-                self.remove_plane(plane)
+            obs, reward, done = self.execute_action(plane, action)
+        return obs, reward, done
+            
     
     def generate_state_grid(self):
         state = np.zeros((NUM_CHANNELS, GRID_WIDTH, GRID_HEIGHT))
@@ -228,9 +299,8 @@ class BradleyAirportEnv(gym.Env):
         return state
 
     # Add a new plane to the environment
-    def add_plane(self):
+    def add_plane(self, plane):
         if len(self.planes) < self.max_aircraft:
-            plane = Aircraft(self.screen_width, self.screen_height)
             self.planes.append(plane)
             self.total_planes += 1
 
