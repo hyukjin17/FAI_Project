@@ -14,7 +14,7 @@ batch_size = 32
 epsilon_start = 1.0
 epsilon_end = 0.1
 epsilon_decay = 0.9995
-target_update_freq = 500  # steps
+target_update_freq = 50  # steps
 max_steps_per_episode = 10000
 
 # Rendering parameters
