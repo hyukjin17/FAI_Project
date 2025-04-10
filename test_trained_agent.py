@@ -1,6 +1,7 @@
 import numpy as np
 import pygame
 import random
+import imageio
 from bradleyenv import BradleyAirportEnv
 from cnn import MultiPlaneDQNAgent
 
@@ -49,15 +50,16 @@ def test_trained_agent():
     agent.load(model_path)
 
     # Reset environment
-    obs, _, _ = env.reset()
+    state, _, _ = env.reset()
     state = env.generate_state_grid()
 
     done = False
-    max_steps = 1000
+    max_steps = 10000
     step_count = 0
 
     setup_pygame()
     clock = pygame.time.Clock()
+    frames = []
 
     while not done and step_count < max_steps:
         # Always maintain 5 planes
@@ -72,6 +74,12 @@ def test_trained_agent():
 
         # Render the environment
         render_env(env)
+
+        # Save the current frame
+        frame = pygame.surfarray.array3d(pygame.display.get_surface())
+        frame = np.transpose(frame, (1, 0, 2))  # Pygame has (width, height), need (height, width)
+        frames.append(frame)
+
         clock.tick(fps)  # Maintain FPS
 
         # Update for next loop
@@ -84,7 +92,10 @@ def test_trained_agent():
                 done = True
 
     pygame.quit()
-    print("Testing finished!")
+    # Save all frames into a gif
+    print("Saving gif...")
+    imageio.mimsave('airport_simulation.gif', frames, fps=fps)
+    print("GIF saved as 'airport_simulation.gif'!")
 
 if __name__ == "__main__":
     test_trained_agent()
