@@ -1,3 +1,5 @@
+![Airport Simulation](airport_simulation4.gif)
+
 # AI Air Traffic Control Tower
 This project implements 2 different implementations for an agent to manage arriving aircraft at Bradley International Airport. The agent learns to assign runways, control aircraft heading and speed, avoid collisions, and guide planes to the gate using a custom reinforcement learning environment powered by PyTorch and Gymnasium.
 The agent is trained using a Deep Q-Network (DQN) approach and a hybrid approach using a Convolutional Neural Network (CNN) and A DQN.
