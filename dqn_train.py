@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 from collections import deque
-from bradleyenv import BradleyAirportEnv
+from dqn_airportEnv import BradleyAirportEnv
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

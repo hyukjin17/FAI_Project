@@ -3,7 +3,7 @@ from gym import spaces
 import numpy as np
 import random
 import pygame
-from aircraft import Aircraft
+from dqn_aircraft import Aircraft
 import math
 
 class BradleyAirportEnv(gym.Env):

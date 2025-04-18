@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from bradleyenv import BradleyAirportEnv
+from dqn_airportEnv import BradleyAirportEnv
 from collections import Counter
 import imageio  
 
