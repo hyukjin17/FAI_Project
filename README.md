@@ -22,5 +22,6 @@ The agent is trained using a Deep Q-Network (DQN) approach and a hybrid approach
 - Run the cnn_training.py to train the CNN + DQN agent
 
 ### 2. Run Trained Agent
-- Run the dqn_vis.py to run the trained DQN agent
-- Run the test_)trained_agent.py to run the trained CNN + DQN agent
+- Run the dqn_vis.py to run the trained DQN agent using the existing pth file
+- Run the test_trained_agent.py to run the trained CNN + DQN agent using the existing pth file
+- Modify the above files if using a different pth file
