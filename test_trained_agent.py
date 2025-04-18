@@ -1,22 +1,26 @@
 import numpy as np
 import pygame
-import random
+import math
 import imageio
 from bradleyenv import BradleyAirportEnv
 from cnn import MultiPlaneDQNAgent
 
 # Hyperparameters
-num_planes = 5
-num_actions = 13
-model_path = "dqn_airport_final.pth"
+num_planes = 3
+num_actions = 12
+model_path = "dqn_airport_final2.pth"
 
 # Pygame setup
 WIDTH, HEIGHT = 800, 800
 fps = 30
 screen = None
 
+BLUE = (0, 0, 255)
 GRAY = (200, 200, 200)
 DARK_GRAY = (50, 50, 50)
+
+# Initialize simulation
+game = BradleyAirportEnv(WIDTH, HEIGHT)
 
 def setup_pygame():
     global screen
@@ -41,39 +45,48 @@ def render_env(env):
     for plane in env.planes:
         pygame.draw.circle(screen, plane.color, (int(plane.x), int(plane.y)), plane.size)
 
+    # Draw wind direction
+    wind_dir = env.wind_direction
+    wind_length = 50  # Length of the arrow
+    wind_x = WIDTH - 100
+    wind_y = 100
+    arrow_end = (int(wind_x + wind_length * math.cos(wind_dir)), int(wind_y - wind_length * math.sin(wind_dir)))
+        
+    pygame.draw.line(screen, BLUE, (wind_x, wind_y), arrow_end, 3)
+    pygame.draw.circle(screen, BLUE, (wind_x, wind_y), 5)  # Wind center
+
     pygame.display.flip()
 
 def test_trained_agent():
     # Initialize environment and agent
-    env = BradleyAirportEnv()
     agent = MultiPlaneDQNAgent(num_planes, num_actions)
     agent.load(model_path)
 
     # Reset environment
-    state, _, _ = env.reset()
-    state = env.generate_state_grid()
+    state, _, _ = game.reset()
+    state = game.generate_state_grid()
 
     done = False
-    max_steps = 10000
+    max_steps = 3000
     step_count = 0
 
     setup_pygame()
     clock = pygame.time.Clock()
+
     frames = []
 
     while not done and step_count < max_steps:
-        # Always maintain 5 planes
-        while len(env.planes) < env.max_aircraft:
-            env.add_plane()
+        while len(game.planes) < num_planes:
+            game.add_plane()
 
         # Select actions (purely greedy, no randomness)
         actions = agent.select_actions(state, epsilon=0.0)
 
         # Step environment
-        next_state, total_reward, per_plane_rewards, done = env.step(actions)
+        next_state, total_reward, per_plane_rewards, done = game.step(actions)
 
         # Render the environment
-        render_env(env)
+        render_env(game)
 
         # Save the current frame
         frame = pygame.surfarray.array3d(pygame.display.get_surface())
@@ -94,8 +107,8 @@ def test_trained_agent():
     pygame.quit()
     # Save all frames into a gif
     print("Saving gif...")
-    imageio.mimsave('airport_simulation.gif', frames, fps=fps)
-    print("GIF saved as 'airport_simulation.gif'!")
+    imageio.mimsave('simulation.gif', frames, fps=fps)
+    print("GIF saved as 'simulation.gif'!")
 
 if __name__ == "__main__":
     test_trained_agent()

@@ -33,9 +33,11 @@ class Aircraft:
         self.color = type_info["color"]
         self.direction = 0
         self.runway = None
+        self.taxiway = None
         self.distance_to_runway = None
         self.taking_off = False
         self.turning_radius = self.update_turning_radius()
+        self.time_step = 0
 
         if self.flight_state == 0:
             # Randomly spawn outside the screen

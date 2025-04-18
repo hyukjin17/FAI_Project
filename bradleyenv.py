@@ -31,10 +31,12 @@ class BradleyAirportEnv(gym.Env):
         super(BradleyAirportEnv, self).__init__()
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.max_aircraft = 5
+        self.max_aircraft = 3
         self.total_planes = 0
         self.planes = []
         self.time_step = 0
+        self.training_progress = 0.0  # percent done with training (0.0 to 1.0)
+        self.stop_after_collision = False  # whether to stop after crash
 
         # Create two Runway objects
         runway_horizontal = Runway(
@@ -72,7 +74,7 @@ class BradleyAirportEnv(gym.Env):
         self.wind_direction = random.choice(self.wind_directions)
 
         # Action Space
-        num_actions = 13
+        num_actions = 12
         self.action_space = spaces.MultiDiscrete([num_actions for _ in range(self.max_aircraft)])
         self.actions = {
             0: "turn_left",
@@ -83,19 +85,18 @@ class BradleyAirportEnv(gym.Env):
             5: "assign_runway_0_direction_1",
             6: "assign_runway_1_direction_0",
             7: "assign_runway_1_direction_1",
-            8: "taxi",
+            8: "assign_taxiway",
             9: "go_to_gate",
             10: "wait",
-            11: "takeoff",
             12: "go_straight"
         }
 
         self.reset()
-        self.add_plane()
 
     def reset(self):
         self.planes = []
         self.total_planes = 0
+        self.wind_direction = random.choice(self.wind_directions)
         for _ in range(self.max_aircraft):
             self.add_plane()
         obs = self.generate_state_grid()
@@ -116,8 +117,9 @@ class BradleyAirportEnv(gym.Env):
         reward = 0
         
         if plane.is_off_screen():
-            self.remove_plane(plane)
-            reward -= 300   # large penalty for going out of screen
+            if plane in self.planes:
+                self.remove_plane(plane)
+            reward -= 100   # large penalty for going out of screen
 
         if plane.runway is None and plane.flight_state == 0:
             return 0
@@ -149,9 +151,11 @@ class BradleyAirportEnv(gym.Env):
                 if taxiway.close_to(plane.x, plane.y):
                     plane.flight_state = 1
                     plane.stop()
-                    reward += 20    # small reward for getting to the taxiway
+                    reward += 30    # small reward for getting to the taxiway
         elif plane.flight_state == 1:
             reward -= 10 # penalty for assigning a move action on a taxiway
+        
+        reward += (0.5 if plane.flight_state == 0 else 0.1) * (0.99 ** plane.time_step) # small positive reward just for surviving a step
 
         return reward   # reward roughly between -5 and 5
     
@@ -183,9 +187,9 @@ class BradleyAirportEnv(gym.Env):
                 action == 6 and math.isclose(self.runways[1].direction, math.pi/2, abs_tol=0.001)):
                 self.runways[1].change_direction()
         if plane.size > 5 and action in [4, 5]:  # Large aircraft on short runway
-            reward -= 100   # Penalty for landing on the wrong runway
+            reward -= 50   # Penalty for landing on the wrong runway
         else:
-            reward += 100   # Reward for assigning the runway correctly
+            reward += 50   # Reward for assigning the runway correctly
         return reward
     
 
@@ -202,6 +206,7 @@ class BradleyAirportEnv(gym.Env):
         reward = 0
         done = False
         self.time_step += 1
+        plane.time_step += 1
 
         if action in [0, 1, 2, 3, 12]:  # Moving or changing direction
             reward += self.move_action(plane, action)
@@ -209,16 +214,20 @@ class BradleyAirportEnv(gym.Env):
             reward += self.assign_runway(plane, action)
         elif action == 8 and plane.flight_state == 2 and plane.runway is not None:   # Taxi
             if plane.speed != 0:
-                reward -= 50    # penalty for assigning a taxiway when the aircraft is not stopped
+                reward -= 30    # penalty for assigning a taxiway when the aircraft is not stopped
             if plane.runway.name == "Runway 0":
                 taxiway = self.taxiways[0]
             else:
                 taxiway = self.taxiways[1]
             plane.runway = None
-            if not taxiway.is_occupied():
+            if not taxiway.is_occupied() and plane.taxiway is None:
+                plane.taxiway = taxiway
                 x,y = taxiway.get_center()
                 direction = math.atan2(y - plane.y, x - plane.x)
                 plane.set_direction(direction)
+                reward += 30    # assigning a taxiway
+            elif plane.taxiway is not None:
+                reward -= 30    # assigning a taxiway when it is already assigned
         elif action == 9:   # Go to gate
             if plane.flight_state == 1: # if on taxiway
                 reward += 100   # reward for getting to gate
@@ -228,28 +237,30 @@ class BradleyAirportEnv(gym.Env):
                 plane.turn("right")
             else:
                 plane.stop()
-            reward -= 1  # Penalty for waiting too long
-
-        elif action == 11: # Takeoff
-            pass
-            # currently not used since all planes are starting in air
+            reward -= 2  # Penalty for waiting too long
 
         plane.move() # Move the plane at each time step
         obs = self.generate_state_grid()
 
         # Check for collisions
         collisions = self.check_grid_collisions(obs)
-        reward -= collisions * 1000
-        if collisions > 0 or self.total_planes == 50:
+        single_plane_done = False
+        if collisions > 0:
+            reward -= 100
+            if self.stop_after_collision:
+                single_plane_done = True  # only end if 70% training done
+            else:
+                single_plane_done = False  # otherwise, let the plane continue
+        if self.total_planes == 40:
             done = True
 
         if plane.runway is not None:
-            crosswind = self.is_within_angle(self.wind_direction, plane.direction, np.pi/2)
+            headwind = self.is_within_angle(self.wind_direction, plane.direction, np.pi/2)
             correct_landing_angle = self.is_within_angle(plane.runway.direction, plane.direction, np.pi/4)
             if (plane.runway.name == "Runway 0" and 100 < plane.x < 400 and 200 < plane.y < 210) or (
                 plane.runway.name == "Runway 1" and 100 < plane.y < 600 and 200 < plane.x < 210):
                 plane.flight_state = 2
-                reward += (-200) if not correct_landing_angle else 100 if crosswind and self.wind_speed == 0 else -100
+                reward += (-30) if not correct_landing_angle else 100 if headwind and self.wind_speed == 0 else -50
 
         all_landed = True
         # checks if all planes have been assigned to gates
@@ -258,12 +269,12 @@ class BradleyAirportEnv(gym.Env):
                 all_landed = False
         if all_landed:
             done = True
-        return obs, reward, done
+        
+        reward = np.clip(reward, -100, 100) / 10 # clip rewards to avoid large gradients and divide by 10 to normalize rewards
+        # reward = reward / 100
+        return obs, reward, done, single_plane_done
 
     def step(self, actions):
-        while len(self.planes) < self.max_aircraft:
-            self.add_plane()
-
         obs = self.generate_state_grid()
         per_plane_rewards = []
         done = False
@@ -272,7 +283,11 @@ class BradleyAirportEnv(gym.Env):
             if plane_index >= len(self.planes):
                 continue  # Skip if action is for non-existing plane
             plane = self.planes[plane_index]
-            obs, reward, done = self.execute_action(plane, action)
+            obs, reward, done, single_plane_done = self.execute_action(plane, action)
+
+            # If any plane triggers done, then done = True
+            done = done or single_plane_done
+
             per_plane_rewards.append(reward)
 
         # padding values just in case
@@ -321,6 +336,14 @@ class BradleyAirportEnv(gym.Env):
 
     def remove_plane(self, plane):
         self.planes.remove(plane)
+
+    def set_training_progress(self, progress):
+        self.training_progress = progress
+        # After 70% training, make crashes much harsher
+        if self.training_progress >= 0.7:
+            self.stop_after_collision = True
+        else:
+            self.stop_after_collision = False
 
     def render(self, mode='human'):
         print(
